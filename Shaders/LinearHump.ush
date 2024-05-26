@@ -1,0 +1,7 @@
+#ifndef LinearHump_H
+#define LinearHump_H
+float LinearHump(float x,float4 params)
+{
+    return params.z/(pow(x+params.x,2)+params.y);
+}
+#endif
