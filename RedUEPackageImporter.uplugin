@@ -14,7 +14,16 @@
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
 	"Installed": false,
+	"EnabledByDefault": true,
 	"Modules": [
+		{
+			"Name": "RedUELegacy",
+			"Type": "Editor",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64"
+			]
+		},
 		{
 			"Name": "RedUEPackageImporter",
 			"Type": "Editor",
@@ -22,6 +31,11 @@
 			"PlatformAllowList": [
 				"Win64"
 			]
+		},
+		{
+			"Name": "RedUELegacyGame",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	]
 }

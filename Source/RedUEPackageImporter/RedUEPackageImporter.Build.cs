@@ -51,6 +51,7 @@ public class RedUEPackageImporter : ModuleRules
                 "EditorStyle",
                 "RenderCore",
                 "ToolMenus",
+                "WorkspaceMenuStructure",
 			}
 			);
 		

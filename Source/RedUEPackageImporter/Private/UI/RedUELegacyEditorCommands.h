@@ -1,9 +1,17 @@
 ﻿#pragma once
 
-class FRedUELegacyEditorCommands: public TCommands<FRedUELegacyEditorCommands>
+class SRedUEPackageExplorer: public  SCompoundWidget
 {
-									FRedUELegacyEditorCommands	();
-	void							RegisterCommands			() override;
 public:
-	TSharedPtr< FUICommandInfo >	ShowUELegacyExplorer;
+	SLATE_BEGIN_ARGS(SRedUEPackageExplorer)
+	{
+		
+	}
+	
+	SLATE_END_ARGS()
+
+	void	Construct	(const FArguments& InArgs);
+protected:
+	FReply	TestClicked	();
+    FReply TestClicked2();
 };

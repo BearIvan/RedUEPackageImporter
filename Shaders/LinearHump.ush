@@ -2,6 +2,6 @@
 #define LinearHump_H
 float LinearHump(float x,float4 params)
 {
-    return params.z/(pow(x+params.x,2)+params.y);
+    return smoothstep(params.x,params.y,x)*(1.f-smoothstep(params.z,params.w,x));
 }
 #endif

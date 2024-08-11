@@ -47,8 +47,14 @@ public class RedUELegacy : ModuleRules
                 "MeshDescription",
                 "StaticMeshDescription",
                 "MaterialEditor",
-                "MaterialUtilities"
-				// ... add private dependencies that you statically link with here ...	
+                "MaterialUtilities", 
+                "zlib",
+                "LZO",
+                "LZX",
+				"RedImage",
+                "EditorSubsystem",
+                "RedUELegacyGame"
+                // ... add private dependencies that you statically link with here ...	
 			}
 			);
 		

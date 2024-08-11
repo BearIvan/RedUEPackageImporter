@@ -1,5 +1,5 @@
 #include "RedUEPackageImporter.h"
-
+DEFINE_LOG_CATEGORY(RedUEPackageImporter);
 
 void FRedUEPackageImporterModule::StartupModule()
 {
