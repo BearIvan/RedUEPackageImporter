@@ -526,6 +526,24 @@ FString ULegacyObject::GetLegacyFullName() const
     return TEXT("");
 }
 
+FString ULegacyObject::GetLegacyName() const
+{
+	if(LegacyPackage)
+	{
+		return LegacyPackage->GetExport(LegacyPackageIndex).ObjectName.ToString();
+	}
+	return TEXT("None");
+}
+
+FName ULegacyObject::GetLegacyFName() const
+{
+	if(LegacyPackage)
+	{
+		return LegacyPackage->GetExport(LegacyPackageIndex).ObjectName;
+	}
+	return NAME_None;
+}
+
 FString ULegacyObject::GetOutContentPath() const
 {
 	if(URedUELegacySubsystem* RedUELegacySubsystem = GetTypedOuter<URedUELegacySubsystem>())

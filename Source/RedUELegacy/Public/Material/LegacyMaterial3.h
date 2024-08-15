@@ -70,6 +70,11 @@ struct FLegacyVectorMaterialInput :public FLegacyMaterialInput
 {
 	GENERATED_BODY()
 };
+USTRUCT(BlueprintType)
+struct FLegacyVector2MaterialInput :public FLegacyMaterialInput
+{
+	GENERATED_BODY()
+};
 
 UCLASS()
 class REDUELEGACY_API ULegacyMaterial3 : public ULegacyMaterialInterface
@@ -85,6 +90,9 @@ public:
 
 	UPROPERTY(BlueprintReadWrite)
 	FLegacyColorMaterialInput DiffuseColor;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FLegacyScalarMaterialInput DiffusePower;
 	
 	UPROPERTY(BlueprintReadWrite)
 	FLegacyColorMaterialInput SpecularColor;
@@ -105,13 +113,31 @@ public:
 	FLegacyScalarMaterialInput OpacityMask;
 	
 	UPROPERTY(BlueprintReadWrite)
-	FLegacyColorMaterialInput TextureDeformer0;
+	FLegacyVector2MaterialInput TextureDeformer0;
 	
 	UPROPERTY(BlueprintReadWrite)
-	FLegacyColorMaterialInput TextureDeformer1;
+	FLegacyVector2MaterialInput TextureDeformer1;
 	
 	UPROPERTY(BlueprintReadWrite)
 	FLegacyColorMaterialInput WorldDeformer;
+
+	UPROPERTY(BlueprintReadWrite)
+	FLegacyVectorMaterialInput LocalDeformer;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FLegacyVectorMaterialInput LocalTangentDeformer;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FLegacyVectorMaterialInput WorldTangentDeformer;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FLegacyColorMaterialInput VertexColorDeformer;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FLegacyScalarMaterialInput VertexOpacityDeformer;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FLegacyScalarMaterialInput GbufferUserValue;
 	
 	
 	UPROPERTY(BlueprintReadWrite)

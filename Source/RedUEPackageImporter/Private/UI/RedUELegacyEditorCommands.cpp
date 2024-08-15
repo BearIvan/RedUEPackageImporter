@@ -21,7 +21,8 @@ FReply SRedUEPackageExplorer::TestClicked2()
 	URedUELegacySubsystem*RedUELegacySubsystem =  GEditor->GetEditorSubsystem<URedUELegacySubsystem>();
 	RedUELegacySubsystem->InContentPath = TEXT("E:\\SteamLibrary\\steamapps\\common\\Singularity\\RvGame\\CookedPC\\");
 	RedUELegacySubsystem->OutContentPath = TEXT("/Game/Singularity");
-	ULegacyPackage *Package = RedUELegacySubsystem->GetPackage(TEXT("menu_blumel"));
+	RedUELegacySubsystem->GetPackage(TEXT("SP_VI_intro_Kismet_XSA"));
+	ULegacyPackage *Package = RedUELegacySubsystem->GetPackage(TEXT("SP_VI_intro_Kismet"));
 	
     int32 TheWorldIndex = Package->FindExport(NAME_TheWorld);
     if(TheWorldIndex!=INDEX_NONE)

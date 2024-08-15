@@ -154,9 +154,10 @@ struct FLegacyMeshUVFloat
     float			U;
     float			V;
 
-    friend FArchive& operator<<(FArchive &Ar, FLegacyMeshUVFloat &M)
+    friend FRedUELegacyArchive& operator<<(FRedUELegacyArchive &Ar, FLegacyMeshUVFloat &M)
     {
-        return Ar << M.U << M.V;
+        Ar << M.U << M.V;
+        return Ar;
     }
 };
 
@@ -165,7 +166,7 @@ struct FLegacyMeshUVHalf
     uint16			U;
     uint16			V;
 
-    friend FArchive& operator<<(FArchive &Ar, FLegacyMeshUVHalf &V)
+    friend FRedUELegacyArchive& operator<<(FRedUELegacyArchive &Ar, FLegacyMeshUVHalf &V)
     {
         Ar << V.U << V.V;
         return Ar;

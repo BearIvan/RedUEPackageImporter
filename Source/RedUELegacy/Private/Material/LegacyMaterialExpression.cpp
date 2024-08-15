@@ -1,14 +1,11 @@
-﻿// Tyran
-
-
-#include "Material/LegacyMaterialExpression.h"
+﻿#include "Material/LegacyMaterialExpression.h"
 
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacyGame.h"
 #include "Material/LegacyMaterial3.h"
 #include "Material/LegacyTexture3.h"
-#include "Material/Expressions/RedUELegacySineRangeMaterialExpression.h"
-#include "Material/Expressions/RedUELegacySineRangeMaterialExpression.h"
+#include "Material/Expressions/RedSineRangeMaterialExpression.h"
+#include "Material/Expressions/RedSineRangeMaterialExpression.h"
 #include "Materials/MaterialExpressionAbs.h"
 #include "Materials/MaterialExpressionAdd.h"
 #include "Materials/MaterialExpressionAppendVector.h"
@@ -30,7 +27,9 @@
 #include "Materials/MaterialExpressionFresnel.h"
 #include "Materials/MaterialExpressionLightVector.h"
 #include "Materials/MaterialExpressionLinearInterpolate.h"
+#include "Materials/MaterialExpressionMaterialFunctionCall.h"
 #include "Materials/MaterialExpressionMultiply.h"
+#include "Materials/MaterialExpressionNamedReroute.h"
 #include "Materials/MaterialExpressionNormalize.h"
 #include "Materials/MaterialExpressionOneMinus.h"
 #include "Materials/MaterialExpressionPanner.h"
@@ -40,6 +39,7 @@
 #include "Materials/MaterialExpressionRotator.h"
 #include "Materials/MaterialExpressionScalarParameter.h"
 #include "Materials/MaterialExpressionSceneDepth.h"
+#include "Materials/MaterialExpressionScreenPosition.h"
 #include "Materials/MaterialExpressionSine.h"
 #include "Materials/MaterialExpressionSmoothStep.h"
 #include "Materials/MaterialExpressionStaticComponentMaskParameter.h"
@@ -57,6 +57,7 @@
 #include "Materials/MaterialExpressionVectorParameter.h"
 #include "Materials/MaterialExpressionVertexColor.h"
 #include "Materials/MaterialExpressionWorldPosition.h"
+#include "Materials/MaterialFunction.h"
 
 template <typename MaterialExpressionType>
 inline MaterialExpressionType* CreateExpressionTyped(UMaterial* Material, UClass* ClassExpression = nullptr)
@@ -103,13 +104,17 @@ bool ULegacyMaterialExpression::LegacySupport_Implementation(ERedUELegacyEngineT
 	return Super::LegacySupport_Implementation(EngineType, GameType);
 }
 
-UMaterialExpression* ULegacyMaterialExpression::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpression::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	ensure(false);
 	return nullptr;
 }
 
-void ULegacyMaterialExpression::SetExpressionInput(FExpressionInput& Out, const FLegacyExpressionInput& In, UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+void ULegacyMaterialExpression::FixExpressionInput(FExpressionInput& Out)
+{
+}
+
+void ULegacyMaterialExpression::SetExpressionInput(FExpressionInput& Out, const FLegacyExpressionInput& In, UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!In.Expression)
 	{
@@ -120,16 +125,17 @@ void ULegacyMaterialExpression::SetExpressionInput(FExpressionInput& Out, const 
 	Out.MaskG = In.MaskG;
 	Out.MaskB = In.MaskB;
 	Out.MaskA = In.MaskA;
-	Out.Expression = In.Expression->CreateExpression(Material,Parameters);
+	In.Expression->FixExpressionInput(Out);
+	Out.Expression = In.Expression->CreateExpression(Material, Parameters);
 }
 
 UMaterialExpression* ULegacyMaterialExpression::StartCreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
-	if(Parameters.WorldDeformer)
+	if (Parameters.WorldDeformer)
 	{
 		UMaterialExpressionSubtract* ExpressionSubtract = CreateExpressionTyped<UMaterialExpressionSubtract>(Material);
 		ExpressionSubtract->PreEditChange(nullptr);
-		ExpressionSubtract->A.Expression = CreateExpression(Material,Parameters);
+		ExpressionSubtract->A.Expression = CreateExpression(Material, Parameters);
 		{
 			UMaterialExpressionWorldPosition* ExpressionWorldPosition = CreateExpressionTyped<UMaterialExpressionWorldPosition>(Material);
 			ExpressionWorldPosition->PreEditChange(nullptr);
@@ -143,20 +149,118 @@ UMaterialExpression* ULegacyMaterialExpression::StartCreateExpression(UMaterial*
 		ExpressionSubtract->Modify();
 		return ExpressionSubtract;
 	}
-	return CreateExpression(Material,Parameters);
+	return CreateExpression(Material, Parameters);
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTextureSample::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+void ULegacyMaterialExpression::Export(UMaterial* OutMaterial, ULegacyMaterial3* InMaterial)
+{
+	UMaterialFunction* LegacyToPBR = LoadObject<UMaterialFunction>(nullptr, TEXT("/RedUEPackageImporter/Materials/MF_LegacyToPBR.MF_LegacyToPBR"));
+
+	UMaterialExpressionMaterialFunctionCall* Expression = CreateExpressionTyped<UMaterialExpressionMaterialFunctionCall>(OutMaterial);
+	OutMaterial->bUseMaterialAttributes = true;
+	FLegacyMaterialExpressionParameters ExpressionParameters;
+	auto SetExpressionInput = [Expression,OutMaterial,&ExpressionParameters](FName InputName, const FLegacyMaterialInput& In)
+	{
+		if (!In.Expression)
+		{
+			return;
+		}
+		int32 ExpressionInputID = Expression->FunctionInputs.IndexOfByPredicate([InputName](const FFunctionExpressionInput& Input)
+		{
+			if (Input.Input.InputName == InputName)
+			{
+				return true;
+			}
+			return false;
+		});
+		if (ensure(ExpressionInputID!=INDEX_NONE))
+		{
+			Expression->FunctionInputs[ExpressionInputID].Input.Mask = In.Mask;
+			Expression->FunctionInputs[ExpressionInputID].Input.MaskR = In.MaskR;
+			Expression->FunctionInputs[ExpressionInputID].Input.MaskG = In.MaskG;
+			Expression->FunctionInputs[ExpressionInputID].Input.MaskB = In.MaskB;
+			Expression->FunctionInputs[ExpressionInputID].Input.MaskA = In.MaskA;
+			Expression->FunctionInputs[ExpressionInputID].Input.Expression = In.Expression->StartCreateExpression(OutMaterial, ExpressionParameters);
+			Expression->FunctionInputs[ExpressionInputID].Input.OutputIndex = 0;
+		}
+	};
+	Expression->SetMaterialFunction(LegacyToPBR);
+	Expression->UpdateFromFunctionResource();
+	{
+		int32 ResultID = Expression->GetOutputs().IndexOfByPredicate([](const FExpressionOutput& Output) { return Output.OutputName == "Result"; });
+		if (ensure(ResultID!=INDEX_NONE))
+		{
+			OutMaterial->GetEditorOnlyData()->MaterialAttributes.Expression = Expression;
+			OutMaterial->GetEditorOnlyData()->MaterialAttributes.OutputIndex = ResultID;
+		}
+	}
+	{
+		int32 CustomVertexColorID = Expression->GetOutputs().IndexOfByPredicate([](const FExpressionOutput& Output) { return Output.OutputName == "CustomVertexColor"; });
+		if (ensure(CustomVertexColorID!=INDEX_NONE))
+		{
+			UMaterialExpressionNamedRerouteDeclaration* VertexColorNamed = CreateExpressionTyped<UMaterialExpressionNamedRerouteDeclaration>(OutMaterial);
+			VertexColorNamed->Input.Expression = Expression;
+			VertexColorNamed->Input.OutputIndex = CustomVertexColorID;
+			VertexColorNamed->Name = "CustomVertexColor";
+			VertexColorNamed->PostEditChange();
+			VertexColorNamed->Modify();
+			ExpressionParameters.CustomVertexColorGuid = VertexColorNamed->VariableGuid;
+			ExpressionParameters.CustomVertexColor = VertexColorNamed;
+		}
+	}
+
+	SetExpressionInput("DiffuseColor", InMaterial->DiffuseColor);
+	SetExpressionInput("DiffusePower", InMaterial->DiffusePower);
+	SetExpressionInput("Specular", InMaterial->SpecularColor);
+	SetExpressionInput("SpecularPower", InMaterial->SpecularPower);
+	SetExpressionInput("Normal", InMaterial->Normal);
+	SetExpressionInput("EmissiveColor", InMaterial->EmissiveColor);
+	SetExpressionInput("Opacity", InMaterial->Opacity);
+	SetExpressionInput("OpacityMask", InMaterial->OpacityMask);
+	ExpressionParameters.WorldDeformer = true;
+	SetExpressionInput("WorldDeformer", InMaterial->WorldDeformer);
+	ExpressionParameters.WorldDeformer = false;
+	SetExpressionInput("LocalDeformer", InMaterial->LocalDeformer);
+	SetExpressionInput("LocalTangentDeformer", InMaterial->LocalTangentDeformer);
+	SetExpressionInput("WorldTangentDeformer", InMaterial->WorldTangentDeformer);
+	
+	ExpressionParameters.VertexColor = true;
+	SetExpressionInput("VertexColorDeformer", InMaterial->VertexColorDeformer);
+	SetExpressionInput("VertexOpacityDeformer", InMaterial->VertexOpacityDeformer);
+	ExpressionParameters.VertexColor = false;
+	
+	SetExpressionInput("GbufferUserValue", InMaterial->GbufferUserValue);
+	
+	ExpressionParameters.IsTextureDeformer = true;
+	if (InMaterial->TextureDeformer0.Expression)
+	{
+		OutMaterial->NumCustomizedUVs++;
+		SetExpressionInput("TextureDeformer0", InMaterial->TextureDeformer0);
+	}
+
+	if (InMaterial->TextureDeformer1.Expression)
+	{
+		OutMaterial->NumCustomizedUVs++;
+		SetExpressionInput("TextureDeformer1", InMaterial->TextureDeformer1);
+	}
+		ExpressionParameters.IsTextureDeformer = false;
+
+	Expression->PostEditChange();
+	Expression->Modify();
+}
+
+
+UMaterialExpression* ULegacyMaterialExpressionTextureSample::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionTextureSample* Expression = CreateExpressionTyped<UMaterialExpressionTextureSample>(Material);
-		SetExpressionInput(Expression->Coordinates, Coordinates, Material,Parameters);
-		if(Texture)
+		SetExpressionInput(Expression->Coordinates, Coordinates, Material, Parameters);
+		if (Texture)
 		{
 			Expression->Texture = CastChecked<UTexture>(Texture->ExportToContent(), ECastCheckedType::NullAllowed);
 		}
-		SetExpressionInput(Expression->TextureObject, SamplerSource, Material,Parameters);
+		SetExpressionInput(Expression->TextureObject, SamplerSource, Material, Parameters);
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -165,17 +269,30 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSample::CreateExpression(UM
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameter2D::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+void ULegacyMaterialExpressionTextureSample::FixExpressionInput(FExpressionInput& Out)
+{
+	Super::FixExpressionInput(Out);
+	if(Out.Mask == 0)
+	{
+		Out.Mask = 1;
+		Out.MaskR = 1;
+		Out.MaskG = 1;
+		Out.MaskB = 1;
+		Out.MaskA = 1;
+	}
+}
+
+UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameter2D::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionTextureSampleParameter2D* Expression = CreateExpressionTyped<UMaterialExpressionTextureSampleParameter2D>(Material);
-		SetExpressionInput(Expression->Coordinates, Coordinates, Material,Parameters);;
-		if(ensure(Texture))
+		SetExpressionInput(Expression->Coordinates, Coordinates, Material, Parameters);;
+		if (Texture)
 		{
 			Expression->Texture = CastChecked<UTexture>(Texture->ExportToContent(), ECastCheckedType::NullAllowed);
 		}
-		SetExpressionInput(Expression->TextureObject, SamplerSource, Material,Parameters);;
+		SetExpressionInput(Expression->TextureObject, SamplerSource, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->ParameterName = ParameterName;
 		Expression->Group = Group;
@@ -186,17 +303,17 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameter2D::CreateEx
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameterCube::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameterCube::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionTextureSampleParameterCube* Expression = CreateExpressionTyped<UMaterialExpressionTextureSampleParameterCube>(Material);
-		SetExpressionInput(Expression->Coordinates, Coordinates, Material,Parameters);;
-		if(ensure(Texture))
+		SetExpressionInput(Expression->Coordinates, Coordinates, Material, Parameters);;
+		if (ensure(Texture))
 		{
 			Expression->Texture = CastChecked<UTexture>(Texture->ExportToContent(), ECastCheckedType::NullAllowed);
 		}
-		SetExpressionInput(Expression->TextureObject, SamplerSource, Material,Parameters);;
+		SetExpressionInput(Expression->TextureObject, SamplerSource, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->ParameterName = ParameterName;
 		Expression->Group = Group;
@@ -207,7 +324,7 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameterCube::Create
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionScalarParameter::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionScalarParameter::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -223,7 +340,7 @@ UMaterialExpression* ULegacyMaterialExpressionScalarParameter::CreateExpression(
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionStaticBoolParameter::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionStaticBoolParameter::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -239,7 +356,7 @@ UMaterialExpression* ULegacyMaterialExpressionStaticBoolParameter::CreateExpress
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionStaticSwitchParameter::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionStaticSwitchParameter::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -248,11 +365,11 @@ UMaterialExpression* ULegacyMaterialExpressionStaticSwitchParameter::CreateExpre
 		Expression->ParameterName = ParameterName;
 		Expression->Group = Group;
 		Expression->DefaultValue = DefaultValue;
-		SetExpressionInput(Expression->A, A, Material,Parameters);;
-		SetExpressionInput(Expression->B, B, Material,Parameters);;
-		if(Parameters.IsTextureDeformer)
+		SetExpressionInput(Expression->A, A, Material, Parameters);;
+		SetExpressionInput(Expression->B, B, Material, Parameters);;
+		if (Parameters.IsTextureDeformer)
 		{
-			if(!A.Expression)
+			if (!A.Expression)
 			{
 				UMaterialExpressionTextureCoordinate* ExpressionConstant = CreateExpressionTyped<UMaterialExpressionTextureCoordinate>(Material);
 				ExpressionConstant->Desc = GetLegacyFullName();
@@ -260,7 +377,7 @@ UMaterialExpression* ULegacyMaterialExpressionStaticSwitchParameter::CreateExpre
 				ExpressionConstant->Modify();
 				Expression->A.Expression = ExpressionConstant;
 			}
-			if(!B.Expression)
+			if (!B.Expression)
 			{
 				UMaterialExpressionTextureCoordinate* ExpressionConstant = CreateExpressionTyped<UMaterialExpressionTextureCoordinate>(Material);
 				ExpressionConstant->Desc = GetLegacyFullName();
@@ -276,10 +393,13 @@ UMaterialExpression* ULegacyMaterialExpressionStaticSwitchParameter::CreateExpre
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionVectorParameter::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionVectorParameter::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
+		UMaterialExpressionAppendVector* AppendVectorExpression = CreateExpressionTyped<UMaterialExpressionAppendVector>(Material);
+		AppendVectorExpression->PostEditChange();
+		AppendVectorExpression->Modify();
 		UMaterialExpressionVectorParameter* Expression = CreateExpressionTyped<UMaterialExpressionVectorParameter>(Material);
 		Expression->Desc = GetLegacyFullName();
 		Expression->ParameterName = ParameterName;
@@ -287,12 +407,16 @@ UMaterialExpression* ULegacyMaterialExpressionVectorParameter::CreateExpression(
 		Expression->DefaultValue = DefaultValue;
 		Expression->PostEditChange();
 		Expression->Modify();
-		CurrentExpression = Expression;
+		AppendVectorExpression->A.Expression = Expression;
+		AppendVectorExpression->B.Expression = Expression;
+		AppendVectorExpression->B.Mask = 1;
+		AppendVectorExpression->B.MaskA = 1;
+		CurrentExpression = AppendVectorExpression;
 	}
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionConstant::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionConstant::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -306,7 +430,7 @@ UMaterialExpression* ULegacyMaterialExpressionConstant::CreateExpression(UMateri
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionConstant2Vector::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionConstant2Vector::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -321,7 +445,7 @@ UMaterialExpression* ULegacyMaterialExpressionConstant2Vector::CreateExpression(
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionConstant3Vector::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionConstant3Vector::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -337,7 +461,7 @@ UMaterialExpression* ULegacyMaterialExpressionConstant3Vector::CreateExpression(
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionConstant4Vector::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionConstant4Vector::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -354,7 +478,7 @@ UMaterialExpression* ULegacyMaterialExpressionConstant4Vector::CreateExpression(
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTextureCoordinate::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionTextureCoordinate::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -370,13 +494,13 @@ UMaterialExpression* ULegacyMaterialExpressionTextureCoordinate::CreateExpressio
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTransform::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionTransform::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionTransform* Expression = CreateExpressionTyped<UMaterialExpressionTransform>(Material);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		switch (TransformSourceType)
 		{
 		case ELegacyMaterialVectorCoordTransformSource::TRANSFORMSOURCE_World:
@@ -414,7 +538,7 @@ UMaterialExpression* ULegacyMaterialExpressionTransform::CreateExpression(UMater
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionReflectionVector::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionReflectionVector::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -428,13 +552,13 @@ UMaterialExpression* ULegacyMaterialExpressionReflectionVector::CreateExpression
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTransformPosition::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionTransformPosition::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionTransformPosition* Expression = CreateExpressionTyped<UMaterialExpressionTransformPosition>(Material);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		switch (TransformSourceType)
 		{
 		case ELegacyMaterialPositionTransformSource::TRANSFORMPOSSOURCE_Local:
@@ -458,14 +582,14 @@ UMaterialExpression* ULegacyMaterialExpressionTransformPosition::CreateExpressio
 }
 
 
-UMaterialExpression* ULegacyMaterialExpressionAdd::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionAdd::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionAdd* Expression = CreateExpressionTyped<UMaterialExpressionAdd>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, A, Material,Parameters);;
-		SetExpressionInput(Expression->B, B, Material,Parameters);;
+		SetExpressionInput(Expression->A, A, Material, Parameters);;
+		SetExpressionInput(Expression->B, B, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -474,14 +598,14 @@ UMaterialExpression* ULegacyMaterialExpressionAdd::CreateExpression(UMaterial* M
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionSubtract::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionSubtract::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionSubtract* Expression = CreateExpressionTyped<UMaterialExpressionSubtract>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, A, Material,Parameters);;
-		SetExpressionInput(Expression->B, B, Material,Parameters);;
+		SetExpressionInput(Expression->A, A, Material, Parameters);;
+		SetExpressionInput(Expression->B, B, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -490,14 +614,14 @@ UMaterialExpression* ULegacyMaterialExpressionSubtract::CreateExpression(UMateri
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionMultiply::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionMultiply::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionMultiply* Expression = CreateExpressionTyped<UMaterialExpressionMultiply>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, A, Material,Parameters);;
-		SetExpressionInput(Expression->B, B, Material,Parameters);;
+		SetExpressionInput(Expression->A, A, Material, Parameters);;
+		SetExpressionInput(Expression->B, B, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -506,14 +630,14 @@ UMaterialExpression* ULegacyMaterialExpressionMultiply::CreateExpression(UMateri
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionDivide::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionDivide::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionDivide* Expression = CreateExpressionTyped<UMaterialExpressionDivide>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, A, Material,Parameters);;
-		SetExpressionInput(Expression->B, B, Material,Parameters);;
+		SetExpressionInput(Expression->A, A, Material, Parameters);;
+		SetExpressionInput(Expression->B, B, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -522,14 +646,14 @@ UMaterialExpression* ULegacyMaterialExpressionDivide::CreateExpression(UMaterial
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionPower::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionPower::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionPower* Expression = CreateExpressionTyped<UMaterialExpressionPower>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Base, Base, Material,Parameters);;
-		SetExpressionInput(Expression->Exponent, Exponent, Material,Parameters);;
+		SetExpressionInput(Expression->Base, Base, Material, Parameters);;
+		SetExpressionInput(Expression->Exponent, Exponent, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -538,15 +662,15 @@ UMaterialExpression* ULegacyMaterialExpressionPower::CreateExpression(UMaterial*
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionClamp::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionClamp::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionClamp* Expression = CreateExpressionTyped<UMaterialExpressionClamp>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
-		SetExpressionInput(Expression->Min, Min, Material,Parameters);;
-		SetExpressionInput(Expression->Max, Max, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
+		SetExpressionInput(Expression->Min, Min, Material, Parameters);;
+		SetExpressionInput(Expression->Max, Max, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -555,7 +679,7 @@ UMaterialExpression* ULegacyMaterialExpressionClamp::CreateExpression(UMaterial*
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTime::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionTime::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -570,13 +694,13 @@ UMaterialExpression* ULegacyMaterialExpressionTime::CreateExpression(UMaterial* 
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionOneMinus::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionOneMinus::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionOneMinus* Expression = CreateExpressionTyped<UMaterialExpressionOneMinus>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -585,13 +709,13 @@ UMaterialExpression* ULegacyMaterialExpressionOneMinus::CreateExpression(UMateri
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionFrac::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionFrac::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionFrac* Expression = CreateExpressionTyped<UMaterialExpressionFrac>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -600,15 +724,15 @@ UMaterialExpression* ULegacyMaterialExpressionFrac::CreateExpression(UMaterial* 
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionLinearInterpolate::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionLinearInterpolate::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionLinearInterpolate* Expression = CreateExpressionTyped<UMaterialExpressionLinearInterpolate>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Alpha, Alpha, Material,Parameters);;
-		SetExpressionInput(Expression->A, A, Material,Parameters);;
-		SetExpressionInput(Expression->B, B, Material,Parameters);;
+		SetExpressionInput(Expression->Alpha, Alpha, Material, Parameters);;
+		SetExpressionInput(Expression->A, A, Material, Parameters);;
+		SetExpressionInput(Expression->B, B, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -617,7 +741,7 @@ UMaterialExpression* ULegacyMaterialExpressionLinearInterpolate::CreateExpressio
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionLightVector::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionLightVector::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -632,13 +756,13 @@ UMaterialExpression* ULegacyMaterialExpressionLightVector::CreateExpression(UMat
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionComponentMask::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionComponentMask::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionComponentMask* Expression = CreateExpressionTyped<UMaterialExpressionComponentMask>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		Expression->R = R;
 		Expression->G = G;
 		Expression->B = B;
@@ -651,13 +775,13 @@ UMaterialExpression* ULegacyMaterialExpressionComponentMask::CreateExpression(UM
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionAbs::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionAbs::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionAbs* Expression = CreateExpressionTyped<UMaterialExpressionAbs>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -666,7 +790,7 @@ UMaterialExpression* ULegacyMaterialExpressionAbs::CreateExpression(UMaterial* M
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionMeshEmitterVertexColor::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionMeshEmitterVertexColor::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -680,7 +804,7 @@ UMaterialExpression* ULegacyMaterialExpressionMeshEmitterVertexColor::CreateExpr
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionPixelDepth::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionPixelDepth::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -694,7 +818,7 @@ UMaterialExpression* ULegacyMaterialExpressionPixelDepth::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionDestDepth::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionDestDepth::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -709,14 +833,14 @@ UMaterialExpression* ULegacyMaterialExpressionDestDepth::CreateExpression(UMater
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionAppendVector::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionAppendVector::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionAppendVector* Expression = CreateExpressionTyped<UMaterialExpressionAppendVector>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, A, Material,Parameters);;
-		SetExpressionInput(Expression->B, B, Material,Parameters);;
+		SetExpressionInput(Expression->A, A, Material, Parameters);;
+		SetExpressionInput(Expression->B, B, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -725,7 +849,7 @@ UMaterialExpression* ULegacyMaterialExpressionAppendVector::CreateExpression(UMa
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionCameraVector::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionCameraVector::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -741,7 +865,7 @@ UMaterialExpression* ULegacyMaterialExpressionCameraVector::CreateExpression(UMa
 			Expression->TransformSourceType = TRANSFORMSOURCE_World;
 			Expression->TransformType = TRANSFORM_Tangent;
 		}
-		
+
 		CurrentExpression = Expression;
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -749,15 +873,15 @@ UMaterialExpression* ULegacyMaterialExpressionCameraVector::CreateExpression(UMa
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionPanner::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionPanner::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionPanner* Expression = CreateExpressionTyped<UMaterialExpressionPanner>(Material);
 		Expression->PreEditChange(nullptr);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->Coordinate, Coordinate, Material,Parameters);;
-		SetExpressionInput(Expression->Time, Time, Material,Parameters);;
+		SetExpressionInput(Expression->Coordinate, Coordinate, Material, Parameters);;
+		SetExpressionInput(Expression->Time, Time, Material, Parameters);;
 		Expression->SpeedX = SpeedX;
 		Expression->SpeedY = SpeedY;
 		Expression->PostEditChange();
@@ -767,13 +891,13 @@ UMaterialExpression* ULegacyMaterialExpressionPanner::CreateExpression(UMaterial
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionConstantClamp::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionConstantClamp::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionClamp* Expression = CreateExpressionTyped<UMaterialExpressionClamp>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		Expression->MinDefault = Min;
 		Expression->MaxDefault = Max;
 		Expression->Desc = GetLegacyFullName();
@@ -784,7 +908,7 @@ UMaterialExpression* ULegacyMaterialExpressionConstantClamp::CreateExpression(UM
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionWorldPosition::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionWorldPosition::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -798,21 +922,35 @@ UMaterialExpression* ULegacyMaterialExpressionWorldPosition::CreateExpression(UM
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionVertexColor::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionVertexColor::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
-		UMaterialExpressionVertexColor* Expression = CreateExpressionTyped<UMaterialExpressionVertexColor>(Material);
-		Expression->PreEditChange(nullptr);
-		Expression->Desc = GetLegacyFullName();
-		Expression->PostEditChange();
-		Expression->Modify();
-		CurrentExpression = Expression;
+		if(!Parameters.VertexColor)
+		{
+			UMaterialExpressionNamedRerouteUsage* Expression= CreateExpressionTyped<UMaterialExpressionNamedRerouteUsage>(Material);
+			Expression->PreEditChange(nullptr);
+			Expression->Desc = GetLegacyFullName();
+			Expression->Declaration = Parameters.CustomVertexColor;
+			Expression->DeclarationGuid = Parameters.CustomVertexColorGuid;
+			Expression->PostEditChange();
+			Expression->Modify();
+			CurrentExpression = Expression;
+		}
+		else
+		{
+			UMaterialExpressionVertexColor* Expression = CreateExpressionTyped<UMaterialExpressionVertexColor>(Material);
+			Expression->PreEditChange(nullptr);
+			Expression->Desc = GetLegacyFullName();
+			Expression->PostEditChange();
+			Expression->Modify();
+			CurrentExpression = Expression;
+		}
 	}
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionFresnel::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionFresnel::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -820,7 +958,7 @@ UMaterialExpression* ULegacyMaterialExpressionFresnel::CreateExpression(UMateria
 		Expression->PreEditChange(nullptr);
 		Expression->Desc = GetLegacyFullName();
 		Expression->Exponent = Exponent;
-		SetExpressionInput(Expression->Normal, Normal, Material,Parameters);;
+		SetExpressionInput(Expression->Normal, Normal, Material, Parameters);;
 		Expression->PostEditChange();
 		Expression->Modify();
 		CurrentExpression = Expression;
@@ -828,14 +966,14 @@ UMaterialExpression* ULegacyMaterialExpressionFresnel::CreateExpression(UMateria
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionFloor::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionFloor::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionFloor* Expression = CreateExpressionTyped<UMaterialExpressionFloor>(Material);
 		Expression->PreEditChange(nullptr);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		Expression->PostEditChange();
 		Expression->Modify();
 		CurrentExpression = Expression;
@@ -843,7 +981,7 @@ UMaterialExpression* ULegacyMaterialExpressionFloor::CreateExpression(UMaterial*
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionStaticComponentMaskParameter::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionStaticComponentMaskParameter::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -856,7 +994,7 @@ UMaterialExpression* ULegacyMaterialExpressionStaticComponentMaskParameter::Crea
 		Expression->DefaultR = DefaultR;
 		Expression->DefaultG = DefaultG;
 		Expression->DefaultB = DefaultB;
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		Expression->PostEditChange();
 		Expression->Modify();
 		CurrentExpression = Expression;
@@ -864,15 +1002,15 @@ UMaterialExpression* ULegacyMaterialExpressionStaticComponentMaskParameter::Crea
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionDesaturation::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionDesaturation::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionDesaturation* Expression = CreateExpressionTyped<UMaterialExpressionDesaturation>(Material);
 		Expression->PreEditChange(nullptr);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
-		SetExpressionInput(Expression->Fraction, Percent, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
+		SetExpressionInput(Expression->Fraction, Percent, Material, Parameters);;
 		Expression->LuminanceFactors = LuminanceFactors;
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -881,16 +1019,16 @@ UMaterialExpression* ULegacyMaterialExpressionDesaturation::CreateExpression(UMa
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionBumpOffset::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionBumpOffset::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionBumpOffset* Expression = CreateExpressionTyped<UMaterialExpressionBumpOffset>(Material);
 		Expression->PreEditChange(nullptr);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->Coordinate, Coordinate, Material,Parameters);;
-		SetExpressionInput(Expression->Height, Height, Material,Parameters);;
-		SetExpressionInput(Expression->HeightRatioInput, HeightRatioInput, Material,Parameters);;
+		SetExpressionInput(Expression->Coordinate, Coordinate, Material, Parameters);;
+		SetExpressionInput(Expression->Height, Height, Material, Parameters);;
+		SetExpressionInput(Expression->HeightRatioInput, HeightRatioInput, Material, Parameters);;
 		Expression->HeightRatio = HeightRatio;
 		Expression->ReferencePlane = ReferencePlane;
 		Expression->PostEditChange();
@@ -900,14 +1038,14 @@ UMaterialExpression* ULegacyMaterialExpressionBumpOffset::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionNormalize::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionNormalize::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionNormalize* Expression = CreateExpressionTyped<UMaterialExpressionNormalize>(Material);
 		Expression->PreEditChange(nullptr);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->VectorInput, VectorInput, Material,Parameters);;
+		SetExpressionInput(Expression->VectorInput, VectorInput, Material, Parameters);;
 		Expression->PostEditChange();
 		Expression->Modify();
 		CurrentExpression = Expression;
@@ -915,15 +1053,15 @@ UMaterialExpression* ULegacyMaterialExpressionNormalize::CreateExpression(UMater
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionDotProduct::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionDotProduct::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionDotProduct* Expression = CreateExpressionTyped<UMaterialExpressionDotProduct>(Material);
 		Expression->PreEditChange(nullptr);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->A, A, Material,Parameters);;
-		SetExpressionInput(Expression->B, B, Material,Parameters);;
+		SetExpressionInput(Expression->A, A, Material, Parameters);;
+		SetExpressionInput(Expression->B, B, Material, Parameters);;
 		Expression->PostEditChange();
 		Expression->Modify();
 		CurrentExpression = Expression;
@@ -931,13 +1069,13 @@ UMaterialExpression* ULegacyMaterialExpressionDotProduct::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionAddConst::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionAddConst::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionAdd* Expression = CreateExpressionTyped<UMaterialExpressionAdd>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, Input, Material,Parameters);;;
+		SetExpressionInput(Expression->A, Input, Material, Parameters);;;
 		Expression->ConstB = R;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
@@ -947,13 +1085,13 @@ UMaterialExpression* ULegacyMaterialExpressionAddConst::CreateExpression(UMateri
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionClampConst::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionClampConst::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionClamp* Expression = CreateExpressionTyped<UMaterialExpressionClamp>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;;
 		Expression->MaxDefault = Max;
 		Expression->MinDefault = Min;
 		Expression->PostEditChange();
@@ -963,13 +1101,13 @@ UMaterialExpression* ULegacyMaterialExpressionClampConst::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionDesaturateConst::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionDesaturateConst::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionDesaturation* Expression = CreateExpressionTyped<UMaterialExpressionDesaturation>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;;
 		{
 			UMaterialExpressionConstant* ConstantExpression = CreateExpressionTyped<UMaterialExpressionConstant>(Material);
 			ConstantExpression->PreEditChange(nullptr);
@@ -987,13 +1125,13 @@ UMaterialExpression* ULegacyMaterialExpressionDesaturateConst::CreateExpression(
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionDivideConst::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionDivideConst::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionDivide* Expression = CreateExpressionTyped<UMaterialExpressionDivide>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, Input, Material,Parameters);;;
+		SetExpressionInput(Expression->A, Input, Material, Parameters);;;
 		Expression->ConstB = R;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
@@ -1003,13 +1141,13 @@ UMaterialExpression* ULegacyMaterialExpressionDivideConst::CreateExpression(UMat
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionMultiplyConst::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionMultiplyConst::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionMultiply* Expression = CreateExpressionTyped<UMaterialExpressionMultiply>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, Input, Material,Parameters);;;
+		SetExpressionInput(Expression->A, Input, Material, Parameters);;;
 		Expression->ConstB = R;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
@@ -1019,22 +1157,22 @@ UMaterialExpression* ULegacyMaterialExpressionMultiplyConst::CreateExpression(UM
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionPlatformSwitch::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionPlatformSwitch::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (InputPC.Expression)
 	{
-		return InputPC.Expression->CreateExpression(Material,Parameters);
+		return InputPC.Expression->CreateExpression(Material, Parameters);
 	}
 	return nullptr;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionPowerConst::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionPowerConst::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionPower* Expression = CreateExpressionTyped<UMaterialExpressionPower>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Base, Input, Material,Parameters);;;
+		SetExpressionInput(Expression->Base, Input, Material, Parameters);;;
 		Expression->ConstExponent = Exponent;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
@@ -1044,7 +1182,7 @@ UMaterialExpression* ULegacyMaterialExpressionPowerConst::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionRandomSeed::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionRandomSeed::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -1059,7 +1197,7 @@ UMaterialExpression* ULegacyMaterialExpressionRandomSeed::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionScreenAspectRatio::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionScreenAspectRatio::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -1074,7 +1212,7 @@ UMaterialExpression* ULegacyMaterialExpressionScreenAspectRatio::CreateExpressio
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionShaderCode::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionShaderCode::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -1113,27 +1251,28 @@ UMaterialExpression* ULegacyMaterialExpressionShaderCode::CreateExpression(UMate
 			{
 				Expression->Inputs.AddDefaulted();
 				Expression->Inputs.Last().InputName = TEXT("var1");
-				SetExpressionInput(Expression->Inputs.Last().Input, A, Material,Parameters);;;
+				SetExpressionInput(Expression->Inputs.Last().Input, A, Material, Parameters);;;
 			}
 			if (I2)
 			{
 				Expression->Inputs.AddDefaulted();
 				Expression->Inputs.Last().InputName = TEXT("var2");
-				SetExpressionInput(Expression->Inputs.Last().Input, B, Material,Parameters);;;
+				SetExpressionInput(Expression->Inputs.Last().Input, B, Material, Parameters);;;
 			}
 			if (I3)
 			{
 				Expression->Inputs.AddDefaulted();
 				Expression->Inputs.Last().InputName = TEXT("var3");
-				SetExpressionInput(Expression->Inputs.Last().Input, C, Material,Parameters);;;
+				SetExpressionInput(Expression->Inputs.Last().Input, C, Material, Parameters);;;
 			}
 			if (I4)
 			{
 				Expression->Inputs.AddDefaulted();
 				Expression->Inputs.Last().InputName = TEXT("var4");
-				SetExpressionInput(Expression->Inputs.Last().Input, D, Material,Parameters);;;
+				SetExpressionInput(Expression->Inputs.Last().Input, D, Material, Parameters);;;
 			}
 		}
+		Expression->IncludeFilePaths.Add(TEXT("/Plugin/RedUEPackageImporter/LinearHump.ush"));
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -1142,15 +1281,15 @@ UMaterialExpression* ULegacyMaterialExpressionShaderCode::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionSineRange::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionSineRange::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
-		URedUELegacySineRangeMaterialExpression* Expression = CreateExpressionTyped<URedUELegacySineRangeMaterialExpression>(Material);
+		URedSineRangeMaterialExpression* Expression = CreateExpressionTyped<URedSineRangeMaterialExpression>(Material);
 		Expression->PreEditChange(nullptr);
-		Expression->Period  = Period;
-		Expression->Min  = Min;
-		Expression->Max  = Max;
+		Expression->Period = Period;
+		Expression->Min = Min;
+		Expression->Max = Max;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -1159,15 +1298,15 @@ UMaterialExpression* ULegacyMaterialExpressionSineRange::CreateExpression(UMater
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionSmoothstep::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionSmoothstep::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionSmoothStep* Expression = CreateExpressionTyped<UMaterialExpressionSmoothStep>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Value, X, Material,Parameters);;
-		SetExpressionInput(Expression->Min, Min, Material,Parameters);;
-		SetExpressionInput(Expression->Max, Max, Material,Parameters);;
+		SetExpressionInput(Expression->Value, X, Material, Parameters);;
+		SetExpressionInput(Expression->Min, Min, Material, Parameters);;
+		SetExpressionInput(Expression->Max, Max, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -1176,14 +1315,14 @@ UMaterialExpression* ULegacyMaterialExpressionSmoothstep::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionStep::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionStep::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionStep* Expression = CreateExpressionTyped<UMaterialExpressionStep>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->X, X, Material,Parameters);;
-		SetExpressionInput(Expression->Y, Y, Material,Parameters);;
+		SetExpressionInput(Expression->X, X, Material, Parameters);;
+		SetExpressionInput(Expression->Y, Y, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -1192,13 +1331,13 @@ UMaterialExpression* ULegacyMaterialExpressionStep::CreateExpression(UMaterial* 
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionSubtractConst::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionSubtractConst::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionSubtract* Expression = CreateExpressionTyped<UMaterialExpressionSubtract>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->A, Input, Material,Parameters);;
+		SetExpressionInput(Expression->A, Input, Material, Parameters);;
 		Expression->ConstB = R;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
@@ -1208,22 +1347,22 @@ UMaterialExpression* ULegacyMaterialExpressionSubtractConst::CreateExpression(UM
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTemp::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionTemp::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (Input.Expression)
 	{
-		return Input.Expression->CreateExpression(Material,Parameters);
+		return Input.Expression->CreateExpression(Material, Parameters);
 	}
 	return nullptr;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTransform2::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionTransform2::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionTransform* Expression = CreateExpressionTyped<UMaterialExpressionTransform>(Material);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		switch (TransformTypeFrom)
 		{
 		case ELegacyMaterialVectorCoordTransformFrom::TRANSFORMFROM_World:
@@ -1261,13 +1400,13 @@ UMaterialExpression* ULegacyMaterialExpressionTransform2::CreateExpression(UMate
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionTransformPosition2::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionTransformPosition2::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionTransformPosition* Expression = CreateExpressionTyped<UMaterialExpressionTransformPosition>(Material);
 		Expression->Desc = GetLegacyFullName();
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		switch (TransformTypeFrom)
 		{
 		case ELegacyMaterialPositionTransformFrom::TRANSFORMPOSFROM_World:
@@ -1305,7 +1444,7 @@ UMaterialExpression* ULegacyMaterialExpressionTransformPosition2::CreateExpressi
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionVS_LocalPosition::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionVS_LocalPosition::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -1314,9 +1453,9 @@ UMaterialExpression* ULegacyMaterialExpressionVS_LocalPosition::CreateExpression
 		{
 			UMaterialExpressionWorldPosition* ExpressionWorld = CreateExpressionTyped<UMaterialExpressionWorldPosition>(Material);
 			ExpressionWorld->PreEditChange(nullptr);
-			Expression->TransformSourceType  = TRANSFORMPOSSOURCE_World;
+			Expression->TransformSourceType = TRANSFORMPOSSOURCE_World;
 			Expression->TransformType = TRANSFORMPOSSOURCE_Local;
-			Expression->Input.Expression = ExpressionWorld;	
+			Expression->Input.Expression = ExpressionWorld;
 			ExpressionWorld->PostEditChange();
 			ExpressionWorld->Modify();
 		}
@@ -1328,7 +1467,7 @@ UMaterialExpression* ULegacyMaterialExpressionVS_LocalPosition::CreateExpression
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionVS_TexCoord0::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionVS_TexCoord0::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -1344,7 +1483,7 @@ UMaterialExpression* ULegacyMaterialExpressionVS_TexCoord0::CreateExpression(UMa
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionVS_TexCoord1::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionVS_TexCoord1::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -1360,7 +1499,7 @@ UMaterialExpression* ULegacyMaterialExpressionVS_TexCoord1::CreateExpression(UMa
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionVS_UndeformedWorldPosition::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionVS_UndeformedWorldPosition::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -1374,7 +1513,7 @@ UMaterialExpression* ULegacyMaterialExpressionVS_UndeformedWorldPosition::Create
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionRotator::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionRotator::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
@@ -1386,11 +1525,11 @@ UMaterialExpression* ULegacyMaterialExpressionRotator::CreateExpression(UMateria
 		FFloatProperty* PropertyCenterX = FindFProperty<FFloatProperty>(MaterialExpressionRotator, "CenterX");
 		FFloatProperty* PropertyCenterY = FindFProperty<FFloatProperty>(MaterialExpressionRotator, "CenterY");
 		Expression->PreEditChange(nullptr);
-		 SetExpressionInput(*PropertyTime->ContainerPtrToValuePtr<FExpressionInput>(Expression), Time, Material,Parameters);;
-		 SetExpressionInput(*PropertyCoordinate->ContainerPtrToValuePtr<FExpressionInput>(Expression), Coordinate, Material,Parameters);;
-		 *PropertySpeed->ContainerPtrToValuePtr<float>(Expression)=Speed;
-		 *PropertyCenterX->ContainerPtrToValuePtr<float>(Expression)=CenterX;
-		 *PropertyCenterY->ContainerPtrToValuePtr<float>(Expression)=CenterY;
+		SetExpressionInput(*PropertyTime->ContainerPtrToValuePtr<FExpressionInput>(Expression), Time, Material, Parameters);;
+		SetExpressionInput(*PropertyCoordinate->ContainerPtrToValuePtr<FExpressionInput>(Expression), Coordinate, Material, Parameters);;
+		*PropertySpeed->ContainerPtrToValuePtr<float>(Expression) = Speed;
+		*PropertyCenterX->ContainerPtrToValuePtr<float>(Expression) = CenterX;
+		*PropertyCenterY->ContainerPtrToValuePtr<float>(Expression) = CenterY;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
 		Expression->Modify();
@@ -1399,13 +1538,13 @@ UMaterialExpression* ULegacyMaterialExpressionRotator::CreateExpression(UMateria
 	return CurrentExpression;
 }
 
-UMaterialExpression* ULegacyMaterialExpressionSine::CreateExpression(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters)
+UMaterialExpression* ULegacyMaterialExpressionSine::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
 {
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionSine* Expression = CreateExpressionTyped<UMaterialExpressionSine>(Material);
 		Expression->PreEditChange(nullptr);
-		SetExpressionInput(Expression->Input, Input, Material,Parameters);;
+		SetExpressionInput(Expression->Input, Input, Material, Parameters);;
 		Expression->Period = Period;
 		Expression->Desc = GetLegacyFullName();
 		Expression->PostEditChange();
@@ -1413,7 +1552,6 @@ UMaterialExpression* ULegacyMaterialExpressionSine::CreateExpression(UMaterial* 
 		CurrentExpression = Expression;
 	}
 	return CurrentExpression;
-	
 }
 
 UMaterialExpression* ULegacyMaterialExpressionCameraWorldPosition::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
@@ -1429,4 +1567,28 @@ UMaterialExpression* ULegacyMaterialExpressionCameraWorldPosition::CreateExpress
 		CurrentExpression = Expression;
 	}
 	return CurrentExpression;
+}
+
+UMaterialExpression* ULegacyMaterialExpressionScreenPosition::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
+{
+	if (!CurrentExpression)
+	{
+		UClass* MaterialExpressionScreenPosition = LoadClass<UMaterialExpression>(nullptr,TEXT("/Script/Engine.MaterialExpressionScreenPosition"));
+		UMaterialExpression* Expression = CreateExpressionTyped<UMaterialExpression>(Material, MaterialExpressionScreenPosition);
+		Expression->PreEditChange(nullptr);
+		Expression->Desc = GetLegacyFullName();
+		Expression->PostEditChange();
+		Expression->Modify();
+		CurrentExpression = Expression;
+	}
+	return CurrentExpression;
+}
+
+UMaterialExpression* ULegacyMaterialExpressionDepthBiasedAlpha::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
+{
+	if(Alpha.Expression)
+	{
+		return Alpha.Expression->CreateExpression(Material, Parameters);
+	}
+	return Super::CreateExpression(Material, Parameters);
 }

@@ -35,38 +35,9 @@ UObject* ULegacyMaterial3::ExportToContent()
 		UPackage*  AssetPackage = CreatePackage(*PackageName);
 		UMaterial* Material = NewObject<UMaterial>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
 		Material->PreEditChange(nullptr);
+		ULegacyMaterialExpression::Export(Material,this);
+	
 		
-		auto  SetExpressionInput = [Material](FExpressionInput&Out,const FLegacyMaterialInput&In,const FLegacyMaterialExpressionParameters&Parameters)
-		{
-			if(!In.Expression)
-			{
-				return;
-			}
-			Out.Mask = In.Mask;
-			Out.MaskR = In.MaskR;
-			Out.MaskG = In.MaskG;
-			Out.MaskB = In.MaskB;
-			Out.MaskA = In.MaskA;
-			Out.Expression = In.Expression->StartCreateExpression(Material,Parameters);
-			
-		};
-		SetExpressionInput(Material->GetEditorOnlyData()->BaseColor,DiffuseColor,{});
-		SetExpressionInput(Material->GetEditorOnlyData()->EmissiveColor,EmissiveColor,{});
-		SetExpressionInput(Material->GetEditorOnlyData()->Opacity,Opacity,{});
-		SetExpressionInput(Material->GetEditorOnlyData()->OpacityMask,OpacityMask,{});
-		SetExpressionInput(Material->GetEditorOnlyData()->WorldPositionOffset,WorldDeformer,{false,true});
-
-		if(TextureDeformer0.Expression)
-		{
-			Material->NumCustomizedUVs++;
-			SetExpressionInput(Material->GetEditorOnlyData()->CustomizedUVs[0],TextureDeformer0,{true});
-		}
-		
-		if(TextureDeformer1.Expression)
-		{
-			Material->NumCustomizedUVs++;
-			SetExpressionInput(Material->GetEditorOnlyData()->CustomizedUVs[1],TextureDeformer1,{true});
-		}
 		switch (BlendMode)
 		{
 		case ELegacyBlendMode::BLEND_Opaque:
@@ -112,6 +83,7 @@ UObject* ULegacyMaterial3::ExportToContent()
 			SortNode(Material->GetEditorOnlyData()->WorldPositionOffset.Expression, Nodes, Y, X);
 			SortNode(Material->GetEditorOnlyData()->CustomizedUVs[0].Expression, Nodes, Y, X);
 			SortNode(Material->GetEditorOnlyData()->CustomizedUVs[1].Expression, Nodes, Y, X);
+			SortNode(Material->GetEditorOnlyData()->MaterialAttributes.Expression, Nodes, Y, X);
 		}
 		switch (LightingModel)
 		{

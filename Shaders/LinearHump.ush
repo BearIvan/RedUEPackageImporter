@@ -4,4 +4,8 @@ float LinearHump(float x,float4 params)
 {
     return smoothstep(params.x,params.y,x)*(1.f-smoothstep(params.z,params.w,x));
 }
+float LinearHalfHump(float x,float2 params)
+{
+    return smoothstep(params.x,params.y,x);
+}
 #endif

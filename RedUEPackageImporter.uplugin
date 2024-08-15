@@ -36,6 +36,11 @@
 			"Name": "RedUELegacyGame",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "RedSingularity",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	]
 }

@@ -4,12 +4,12 @@
 void ULegacyStaticMeshActor::Spawn_Implementation()
 {
     Super::Spawn_Implementation();
+    AStaticMeshActor* StaticMeshActor = GWorld->SpawnActor<AStaticMeshActor>(FVector(StaticMeshComponent->Translation),FRotator(StaticMeshComponent->Rotation));
+    StaticMeshActor->SetActorScale3D(FVector(StaticMeshComponent->Scale3D));
     if(StaticMeshComponent&&StaticMeshComponent->StaticMesh)
     {
         if(UStaticMesh* StaticMesh = CastChecked<UStaticMesh>(StaticMeshComponent->StaticMesh->ExportToContent(),ECastCheckedType::NullAllowed))
         {
-            AStaticMeshActor* StaticMeshActor = GWorld->SpawnActor<AStaticMeshActor>(FVector(StaticMeshComponent->Translation),FRotator(StaticMeshComponent->Rotation));
-            StaticMeshActor->SetActorScale3D(FVector(StaticMeshComponent->Scale3D));
             StaticMeshActor->GetStaticMeshComponent()->SetStaticMesh(StaticMesh);
             for(int32  i = 0; i < StaticMeshComponent->Materials.Num();i++)
             {
@@ -19,5 +19,6 @@ void ULegacyStaticMeshActor::Spawn_Implementation()
                 }
             }
         }
+        PresentObject = StaticMeshActor;
     }
 }

@@ -17,6 +17,8 @@ public:
     virtual void        LegacySerializeUnrealProps  (UStruct* Type, void*Object,FRedUELegacyArchive& Ar);
     virtual UObject*    ExportToContent             ();
             FString     GetLegacyFullName           () const;
+            FString     GetLegacyName				() const;
+            FName	    GetLegacyFName				() const;
     
     int32           LegacyPackageIndex = INDEX_NONE;
     int64			LegacyObjectFlags;

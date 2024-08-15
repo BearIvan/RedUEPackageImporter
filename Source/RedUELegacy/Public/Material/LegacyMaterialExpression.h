@@ -29,8 +29,11 @@ struct FLegacyExpressionInput
 
 struct FLegacyMaterialExpressionParameters
 {
-	bool IsTextureDeformer = false;
-	bool WorldDeformer = false;
+	bool 														IsTextureDeformer = false;
+	bool 														WorldDeformer = false;
+	FGuid														CustomVertexColorGuid;
+	TObjectPtr<class UMaterialExpressionNamedRerouteDeclaration>CustomVertexColor;
+	bool 														VertexColor = false;
 };
 
 UCLASS()
@@ -41,9 +44,10 @@ public:
 	virtual void					LegacySerialize						(FRedUELegacyArchive& Ar) override;
 	virtual bool					LegacySupport_Implementation		(ERedUELegacyEngineType EngineType, ERedUELegacyGameType GameType) override;
 	virtual UMaterialExpression*	CreateExpression					(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters);
+	virtual	void					FixExpressionInput					(FExpressionInput& Out);
 			void					SetExpressionInput					(FExpressionInput&Out,const FLegacyExpressionInput&In,UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters);
 			UMaterialExpression*	StartCreateExpression				(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters);
-	
+			static void				Export								(UMaterial* OutMaterial,class ULegacyMaterial3*InMaterial);
 	UPROPERTY(Transient)
 	UMaterialExpression*			CurrentExpression;
 };
@@ -63,6 +67,8 @@ class REDUELEGACY_API ULegacyMaterialExpressionTextureSample : public ULegacyMat
 	GENERATED_BODY()
 public:
 	virtual UMaterialExpression*	CreateExpression	(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters) override;
+	
+	virtual	void					FixExpressionInput	(FExpressionInput& Out);
 	
 	UPROPERTY(BlueprintReadWrite)
 	FLegacyExpressionInput Coordinates;
@@ -1087,4 +1093,23 @@ class ULegacyMaterialExpressionCameraWorldPosition : public ULegacyMaterialExpre
 	GENERATED_BODY()
 public:
 	virtual UMaterialExpression*	CreateExpression	(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters) override;
+};
+
+UCLASS()
+class ULegacyMaterialExpressionScreenPosition : public ULegacyMaterialExpression
+{
+	GENERATED_BODY()
+public:
+	virtual UMaterialExpression*	CreateExpression	(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters) override;
+};
+
+UCLASS()
+class ULegacyMaterialExpressionDepthBiasedAlpha  : public ULegacyMaterialExpression
+{
+	GENERATED_BODY()
+public:	
+	virtual UMaterialExpression*	CreateExpression	(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FLegacyExpressionInput Alpha;
 };

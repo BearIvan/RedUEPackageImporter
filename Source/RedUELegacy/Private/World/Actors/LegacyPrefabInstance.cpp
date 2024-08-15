@@ -22,4 +22,5 @@ void ULegacyPrefabInstance::Spawn_Implementation()
             LevelLegacyStaticMeshActor->StaticMeshComponent->Materials = TemplateLegacyStaticMeshActor->StaticMeshComponent->Materials;
         }
     }
+    
 }

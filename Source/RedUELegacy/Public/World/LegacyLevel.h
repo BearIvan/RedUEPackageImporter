@@ -5,15 +5,28 @@
 #include "Core/LegacyObject.h"
 #include "LegacyLevel.generated.h"
 
+class ULegacySequence;
+
 UCLASS()
 class REDUELEGACY_API ULegacyLevel : public ULegacyObject
 {
     GENERATED_BODY()
 
 public:
-    virtual void LegacySerialize(FRedUELegacyArchive& Ar) override;
-    virtual UObject* ExportToContent() override;
+    virtual void        LegacySerialize(FRedUELegacyArchive& Ar) override;
+    virtual UObject*    ExportToContent() override;
+	
+            FURL		URL;
     
-    UPROPERTY(BlueprintReadOnly)
+    UPROPERTY()
     TArray<ULegacyActor*> Actors;
+
+    UPROPERTY()
+    UObject * Model;
+    
+    UPROPERTY()
+    TArray<UObject*> ModelComponents;
+    
+    UPROPERTY()
+    TArray<ULegacySequence*> GameSequences;
 };

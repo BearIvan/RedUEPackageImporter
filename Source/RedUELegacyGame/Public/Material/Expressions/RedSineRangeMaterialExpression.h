@@ -1,13 +1,13 @@
 ﻿#pragma once
 
-#include "RedUELegacySineRangeMaterialExpression.generated.h"
+#include "RedSineRangeMaterialExpression.generated.h"
 
 UCLASS()
-class REDUELEGACYGAME_API URedUELegacySineRangeMaterialExpression : public UMaterialExpression
+class REDUELEGACYGAME_API URedSineRangeMaterialExpression : public UMaterialExpression
 {
 	GENERATED_BODY()
 public:
-					URedUELegacySineRangeMaterialExpression	(const FObjectInitializer& ObjectInitializer);
+					URedSineRangeMaterialExpression	(const FObjectInitializer& ObjectInitializer);
 #if WITH_EDITOR
 	virtual int32	Compile									(class FMaterialCompiler* Compiler, int32 OutputIndex) override;
 	virtual void	GetCaption								(TArray<FString>& OutCaptions) const override;
