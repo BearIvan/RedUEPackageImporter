@@ -6,6 +6,7 @@
 void ULegacyTexture3::LegacySerialize(FRedUELegacyArchive& Ar)
 {
 	Super::LegacySerialize(Ar);
+	if (Ar.Game == ERedUELegacyGame::Bioshock3) return;
 	SourceArt.Serialize(Ar);
 }
 

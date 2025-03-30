@@ -162,5 +162,5 @@ public:
 	TArray<ULegacyObject*> ReferencedTextures;
 	
 	UPROPERTY(BlueprintReadWrite)
-	TArray<UObject*> Expressions;
+	TArray<ULegacyMaterialExpression*> Expressions;
 };

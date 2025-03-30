@@ -135,8 +135,8 @@ bool ULegacyMaterial3::SortNode(UMaterialExpression* Start, TSet<UMaterialExpres
 	Nodes.Add(Start);
 	Start->MaterialExpressionEditorX = X;
 	Start->MaterialExpressionEditorY = Y;
-	TArray<FExpressionInput*> Inputs = Start->GetInputs();
-	for (int i = 0; i < Inputs.Num(); i++)
+	TArrayView<FExpressionInput*> Inputs = Start->GetInputsView();
+	for (int i = 0; i <Inputs.Num(); i++)
 	{
 		if(SortNode(Inputs[i]->Expression, Nodes, Y, X - 500))
 			Y += 150;

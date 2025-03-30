@@ -10,6 +10,7 @@ enum class ERedUELegacyGame:uint32
 	UE2X			= 0x0400000,
     UE3             = 0x0800000,
     Singularity,
+    Bioshock3,
     Engine          = 0xFFF0000,
 };
 ENUM_CLASS_FLAGS(ERedUELegacyGame)
@@ -19,6 +20,7 @@ enum class ERedUELegacyGameType:uint8
 {
     Bioshock,
     Singularity,
+    Bioshock3,
     Unkown,
 };
 

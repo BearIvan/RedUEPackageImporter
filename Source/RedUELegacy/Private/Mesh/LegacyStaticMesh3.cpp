@@ -62,10 +62,20 @@ void ULegacyStaticMesh3::LegacySerialize(FRedUELegacyArchive& Ar)
         // new serialization code
         // bug in Singularity serialization code: serialized the same things twice!
     }
+	
+	if (Ar.Game ==  ERedUELegacyGame::Bioshock3)
+	{
+		FVector3f v1, v2[2], v3;
+		TArray<int> arr4;
+		Ar << v1 << v2[0] << v2[1] << v3 << arr4;
+		goto SInternalVersion;
+	}
+	
     if (Ar.Game != ERedUELegacyGame::Singularity&&Ar.LegacyVer < 770)
     {
         Ar.LegacyBulkSerialize(kDOPNodes);
     }
+	
     else
     {
         FLegacykDOPBounds kDOPBounds;
@@ -74,7 +84,7 @@ void ULegacyStaticMesh3::LegacySerialize(FRedUELegacyArchive& Ar)
         Ar.LegacyBulkSerialize(Nodes);
     }
     Ar.LegacyBulkSerialize(kDOPTriangles);
-    
+    SInternalVersion:
     Ar << InternalVersion;
     if (InternalVersion >= 17 && Ar.LegacyVer < 593)
     {

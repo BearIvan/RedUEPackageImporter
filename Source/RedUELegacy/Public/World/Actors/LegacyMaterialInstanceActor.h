@@ -14,6 +14,6 @@ public:
 	virtual void Spawn_Implementation() override;
 	
 	UPROPERTY(BlueprintReadWrite)
-	ULegacyMaterialInstanceConstant* MatInst;
+	class ULegacyMaterialInstanceConstant* MatInst;
 	
 };

@@ -23,6 +23,8 @@ void ULegacyTexture2D::LegacySerialize(FRedUELegacyArchive& Ar)
 		Format = static_cast<ELegacyPixelFormat>(Format2);		// int -> byte (enum)
 	}
 	Ar<<Mips;
+	
+	if (Ar.Game ==  ERedUELegacyGame::Bioshock3) return;
 	if (Ar.LegacyVer >= 567)
 	{
 		Ar << TextureFileCacheGuid;

@@ -19,11 +19,21 @@ FReply SRedUEPackageExplorer::TestClicked()
 FReply SRedUEPackageExplorer::TestClicked2()
 {
 	URedUELegacySubsystem*RedUELegacySubsystem =  GEditor->GetEditorSubsystem<URedUELegacySubsystem>();
-	RedUELegacySubsystem->InContentPath = TEXT("E:\\SteamLibrary\\steamapps\\common\\Singularity\\RvGame\\CookedPC\\");
-	RedUELegacySubsystem->OutContentPath = TEXT("/Game/Singularity");
-	RedUELegacySubsystem->GetPackage(TEXT("SP_VI_intro_Kismet_XSA"));
-	ULegacyPackage *Package = RedUELegacySubsystem->GetPackage(TEXT("SP_VI_intro_Kismet"));
+
 	
+	RedUELegacySubsystem->InContentPaths.Add(TEXT("F:\\SteamLibrary\\steamapps\\common\\BioShock Infinite\\XGame\\CookedPCConsole_FR"));
+	RedUELegacySubsystem->InContentPaths.Add(TEXT("F:\\SteamLibrary\\steamapps\\common\\BioShock Infinite\\DLC\\DLCB\\CookedPCConsole_FR"));
+	
+	RedUELegacySubsystem->OutContentPath = TEXT("/Game/Bioshock");
+	//RedUELegacySubsystem->GetPackage(TEXT("SP_VI_intro_Kismet_XSA"));
+	ULegacyPackage *Package = RedUELegacySubsystem->GetPackage(TEXT("S_DEPT_Entrance_Geo"));
+
+	
+	// RedUELegacySubsystem->InContentPath = TEXT("E:\\SteamLibrary\\steamapps\\common\\Singularity\\RvGame\\CookedPC\\");
+	// RedUELegacySubsystem->OutContentPath = TEXT("/Game/Singularity");
+	// //RedUELegacySubsystem->GetPackage(TEXT("SP_VI_intro_Kismet_XSA"));
+	// ULegacyPackage *Package = RedUELegacySubsystem->GetPackage(TEXT("menu_blumel"));
+	//
     int32 TheWorldIndex = Package->FindExport(NAME_TheWorld);
     if(TheWorldIndex!=INDEX_NONE)
     {
@@ -52,10 +62,10 @@ void SRedUEPackageExplorer::Construct(const FArguments& InArgs)
 				.Text(FText::FromString(TEXT("This is a tab example."))),
 				SNew(SButton)
 				.Text(FText::FromString(TEXT("Test")))
-				.OnClicked(this,&SRedUEPackageExplorer::TestClicked),
-				SNew(SButton)
-                .Text(FText::FromString(TEXT("Test2")))
-                .OnClicked(this,&SRedUEPackageExplorer::TestClicked2)
+				.OnClicked(this,&SRedUEPackageExplorer::TestClicked2)
+				// SNew(SButton)
+    //             .Text(FText::FromString(TEXT("Test2")))
+    //             .OnClicked(this,&SRedUEPackageExplorer::TestClicked2)
 			]
 		]
 	];

@@ -30,6 +30,7 @@ struct FLegacyExpressionInput
 struct FLegacyMaterialExpressionParameters
 {
 	bool 														IsTextureDeformer = false;
+	bool														IsNormalMap = false;
 	bool 														WorldDeformer = false;
 	FGuid														CustomVertexColorGuid;
 	TObjectPtr<class UMaterialExpressionNamedRerouteDeclaration>CustomVertexColor;
@@ -93,6 +94,14 @@ public:
 
 UCLASS()
 class ULegacyMaterialExpressionTextureSampleParameter2D : public ULegacyMaterialExpressionTextureSampleParameter
+{
+	GENERATED_BODY()
+public:
+	virtual UMaterialExpression*	CreateExpression	(UMaterial* Material,const FLegacyMaterialExpressionParameters&Parameters) override;
+};
+
+UCLASS()
+class ULegacyMaterialExpressionTextureSampleParameterNormal : public ULegacyMaterialExpressionTextureSampleParameter2D
 {
 	GENERATED_BODY()
 public:

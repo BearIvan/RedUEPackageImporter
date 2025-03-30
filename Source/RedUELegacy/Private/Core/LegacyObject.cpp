@@ -544,6 +544,7 @@ FName ULegacyObject::GetLegacyFName() const
 	return NAME_None;
 }
 
+
 FString ULegacyObject::GetOutContentPath() const
 {
 	if(URedUELegacySubsystem* RedUELegacySubsystem = GetTypedOuter<URedUELegacySubsystem>())

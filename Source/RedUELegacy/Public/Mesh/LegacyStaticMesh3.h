@@ -3,6 +3,7 @@
 #include "Core/LegacyObject.h"
 #include "Core/LegacyPackage.h"
 #include "Core/RedUELegacyArchive.h"
+#include "Material/LegacyMaterialInterface.h"
 #include "LegacyStaticMesh3.generated.h"
 
 
@@ -100,7 +101,7 @@ struct FLegacyPS3StaticMeshData
 
 struct FLegacyStaticMeshSection3
 {
-    class ULegacyMaterialInterface* Mat;
+    ULegacyMaterialInterface* Mat;
     int32				            f10;		//?? bUseSimple...Collision
     int32				            f14;		//?? ...
     int32				            bEnableShadowCasting;
@@ -118,6 +119,11 @@ struct FLegacyStaticMeshSection3
         Ar << S.FirstIndex << S.NumFaces << S.f24 << S.f28;
         if (Ar.LegacyVer >= 492) Ar << S.Index;
 		if (Ar.LegacyVer >= 514) Ar << S.f30;
+        if (Ar.Game == ERedUELegacyGame::Bioshock3)
+        {
+            FString unk4;
+            Ar << unk4;
+        }
         if (Ar.LegacyVer >= 618)
         {
             uint8 unk;
@@ -133,6 +139,47 @@ struct FLegacyStaticMeshSection3
 };
 
 
+
+struct FLegacyVectorIntervalFixed48Bio
+{
+    uint16			X, Y, Z;
+
+    FVector3f ToVector(const FVector3f &Mins, const FVector3f &Ranges) const
+    {
+        FVector3f r;
+        r.X = (X / 65535.0f) * Ranges.X + Mins.X;
+        r.Y = (Y / 65535.0f) * Ranges.Y + Mins.Y;
+        r.Z = (Z / 65535.0f) * Ranges.Z + Mins.Z;
+        return r;
+    }
+
+    friend FArchive& operator<<(FArchive &Ar, FLegacyVectorIntervalFixed48Bio &V)
+    {
+        return Ar << V.X << V.Y << V.Z;
+    }
+};
+
+
+struct FLegacyVectorIntervalFixed64
+{
+    int16			X, Y, Z, W;
+
+    FVector3f ToVector(const FVector3f &Mins, const FVector3f &Ranges) const
+    {
+        FVector3f r;
+        r.X = (X / 32767.0f) * Ranges.X + Mins.X;
+        r.Y = (Y / 32767.0f) * Ranges.Y + Mins.Y;
+        r.Z = (Z / 32767.0f) * Ranges.Z + Mins.Z;
+        return r;
+    }
+
+    friend FArchive& operator<<(FArchive &Ar, FLegacyVectorIntervalFixed64 &V)
+    {
+        return Ar << V.X << V.Y << V.Z << V.W;
+    }
+};
+
+
 struct FLegacyStaticMeshVertexStream3
 {
     int					    VertexSize;		// 0xC
@@ -140,7 +187,35 @@ struct FLegacyStaticMeshVertexStream3
     TArray<FVector3f>		Verts;
     friend FRedUELegacyArchive& operator<<(FRedUELegacyArchive &Ar, FLegacyStaticMeshVertexStream3 &S)
     {
+        
         Ar << S.VertexSize << S.NumVerts;
+        if (Ar.Game == ERedUELegacyGame::Bioshock3)
+        {
+            uint8 IsPacked, VectorType;		// VectorType used only when IsPacked != 0
+            FVector3f Mins, Extents;
+            Ar << IsPacked << VectorType << Mins << Extents;
+            if (IsPacked)
+            {
+                if (VectorType)
+                {
+                    TArray<FLegacyVectorIntervalFixed48Bio> Vecs16x3;
+                    Ar.LegacyBulkSerialize(Vecs16x3);
+                    S.Verts.AddUninitialized(Vecs16x3.Num());
+                    for (int i = 0; i < Vecs16x3.Num(); i++)
+                        S.Verts[i] = Vecs16x3[i].ToVector(Mins, Extents);
+                }
+                else
+                {
+                    TArray<FLegacyVectorIntervalFixed64> Vecs16x4;
+                    Ar.LegacyBulkSerialize(Vecs16x4);
+                    S.Verts.AddUninitialized(Vecs16x4.Num());
+                    for (int i = 0; i < Vecs16x4.Num(); i++)
+                        S.Verts[i] = Vecs16x4[i].ToVector(Mins, Extents);
+                }
+                return Ar;
+            }
+            // else - normal vertex stream
+        }
         Ar.LegacyBulkSerialize(S.Verts);
         return Ar;
     }

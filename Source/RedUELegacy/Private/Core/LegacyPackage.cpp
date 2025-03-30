@@ -75,21 +75,33 @@ void FRedUELegacyPackageFileSummary::Serialize2(FRedUELegacyArchive& Ar)
 
 void FRedUELegacyPackageFileSummary::Serialize3(FRedUELegacyArchive& Ar)
 {
+	if (Ar.Game == ERedUELegacyGame::Bioshock3)
+	{
+		int32 unkC;
+		Ar << unkC;
+	}
+	
 	if (Ar.LegacyVer >= 249)
 		Ar << HeadersSize;
 	else
 		HeadersSize = 0;
-
+	
 	if (Ar.LegacyVer >= 269)
 		Ar << PackageGroup;
 
 	Ar << PackageFlags;
 	Ar << NameCount << NameOffset << ExportCount << ExportOffset;
 	Ar << ImportCount << ImportOffset;
+
 	if (Ar.LegacyVer >= 415)
 		Ar << DependsOffset;
-	if (Ar.LegacyVer >= 623)
-		Ar << ImportExportGuidsOffset << ImportGuidsCount << ExportGuidsCount;
+	
+	if (Ar.Game != ERedUELegacyGame::Bioshock3)
+	{
+		if (Ar.LegacyVer >= 623)
+			Ar << ImportExportGuidsOffset << ImportGuidsCount << ExportGuidsCount;
+	}
+
 	if (Ar.LegacyVer >= 584)
 	{
 		int32 ThumbnailTableOffset;
@@ -236,6 +248,12 @@ void FRedUELegacyObjectExport::Serialize3(FRedUELegacyArchive& Ar)
 	}
 	
 	if (Ar.LegacyVer >= 247) Ar << ExportFlags;
+	if (Ar.Game == ERedUELegacyGame::Bioshock3)
+	{
+		int flag;
+		Ar << flag;
+		if (!flag) return;	
+	}
 	if (Ar.LegacyVer >= 322) Ar << NetObjectCount << Guid;
 	if (Ar.LegacyVer >= 475) Ar << U3unk6C;
 
@@ -354,17 +372,25 @@ void FRedUELegacyByteBulkData::Skip(FRedUELegacyArchive& Ar)
 void FRedUELegacyByteBulkData::LoadFromFile(const FString& Name)
 {
 	URedUELegacySubsystem*RedUELegacySubsystem = GEditor->GetEditorSubsystem<URedUELegacySubsystem>();
-	const FString Path = FPaths::Combine( RedUELegacySubsystem->InContentPath,Name);
-    FArchive *TFCReader = IFileManager::Get().CreateFileReader(*Path);
-    if(!TFCReader)
-    {
-        TFCReader = IFileManager::Get().CreateFileReader(*(Path  + TEXT(".tfc")));
-    }
-	if(TFCReader)
+	for (const FString&InContentPath :RedUELegacySubsystem->InContentPaths)
 	{
-		SerializeData(*TFCReader);
-		delete TFCReader;
+		FString Path = FPaths::Combine( InContentPath,Name);
+		if (!FPaths::FileExists(Path))
+		{
+			Path +=  TEXT(".tfc");
+			if (!FPaths::FileExists(Path))
+			{
+				continue;
+			}
+		}
+		if(FArchive *TFCReader = IFileManager::Get().CreateFileReader(*Path);ensure(TFCReader))
+		{
+			SerializeData(*TFCReader);
+			delete TFCReader;
+		}
+		return;
 	}
+ 
 }
 
 void FRedUELegacyByteBulkData::SerializeDataChunk(FArchive& Ar)
@@ -377,7 +403,7 @@ void FRedUELegacyByteBulkData::SerializeDataChunk(FArchive& Ar)
 	if (BulkDataFlags & (0x02 | 0x10 | 0x80))
 	{
 		int32 flags = 0;
-		if (BulkDataFlags & 0x02) flags = COMPRESS_ZLIB;
+		if (BulkDataFlags & 0x02) flags = 0x1;
 		if (BulkDataFlags & 0x10)  flags = 0x2;
 		if (BulkDataFlags & 0x80)  flags = 0x4;
 		FRedUELegacyArchiveFileHandle::Decompress(Ar, BulkData, DataSize, flags);
@@ -400,7 +426,17 @@ bool ULegacyPackage::LoadPackage(const TCHAR* InFileName)
     FileName = InFileName;
 	IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
 	URedUELegacySubsystem*RedUELegacySubsystem =  GetTypedOuter<URedUELegacySubsystem>();
-	FileHandle =  PlatformFile.OpenRead(*FPaths::Combine(RedUELegacySubsystem->InContentPath,*FileName));
+	
+	for (const FString&InContentPath :RedUELegacySubsystem->InContentPaths)
+	{
+		const FString Path = FPaths::Combine( InContentPath,FileName);
+		if (FPaths::FileExists(Path))
+		{
+			FileHandle =  PlatformFile.OpenRead(*Path);
+			break;
+		}
+	}
+	
 	if(!FileHandle)
 	{
 		FileHandle =  PlatformFile.OpenRead(*FileName);
@@ -445,6 +481,9 @@ bool ULegacyPackage::LoadPackage(const TCHAR* InFileName)
     case ERedUELegacyGame::Singularity:
         GameType = ERedUELegacyGameType::Singularity;
         break;
+	case ERedUELegacyGame::Bioshock3:
+		GameType = ERedUELegacyGameType::Bioshock3;
+    	break;
     default: 
         GameType = ERedUELegacyGameType::Unkown;
         break;
@@ -874,6 +913,16 @@ void ULegacyPackage::SetupReader(int32 ExportIndex)
 	const FRedUELegacyObjectExport &Exp = GetExport(ExportIndex);
     Seek(Exp.SerialOffset);
     Stopper = Exp.SerialOffset+Exp.SerialSize;
+}
+
+ULegacyObject* ULegacyPackage::FindOrCreateExport(FName Name)
+{
+	int32 Index = FindExport(Name);
+	if(Index!=INDEX_NONE)
+	{
+		return GetOrCreateExport(Index);
+	}
+	return nullptr;
 }
 
 void ULegacyPackage::LoadNameTable()

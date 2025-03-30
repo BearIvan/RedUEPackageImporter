@@ -7,6 +7,8 @@ void FRedUELegacyArchive::DetectGame()
 	 	Game = ERedUELegacyGame::Bioshock;
 	if (LegacyVer == 584 && LegacyLicenseeVer == 126)
 		Game = ERedUELegacyGame::Singularity;
+	if (LegacyVer == 727 && LegacyLicenseeVer == 75)
+		Game = ERedUELegacyGame::Bioshock3;
 	if (Game == ERedUELegacyGame::Unkown)
 	{
 		// generic or unknown engine

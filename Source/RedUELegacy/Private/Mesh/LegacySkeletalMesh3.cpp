@@ -26,4 +26,5 @@ void ULegacySkeletalMesh3::LegacySerialize(FRedUELegacyArchive& Ar)
 UObject* ULegacySkeletalMesh3::ExportToContent()
 {
 	return Super::ExportToContent();
+	
 }

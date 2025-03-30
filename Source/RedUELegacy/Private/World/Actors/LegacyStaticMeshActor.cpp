@@ -4,8 +4,8 @@
 void ULegacyStaticMeshActor::Spawn_Implementation()
 {
     Super::Spawn_Implementation();
-    AStaticMeshActor* StaticMeshActor = GWorld->SpawnActor<AStaticMeshActor>(FVector(StaticMeshComponent->Translation),FRotator(StaticMeshComponent->Rotation));
-    StaticMeshActor->SetActorScale3D(FVector(StaticMeshComponent->Scale3D));
+    AStaticMeshActor* StaticMeshActor = GWorld->SpawnActor<AStaticMeshActor>(FVector(Translation),FRotator(Rotation));
+    StaticMeshActor->SetActorScale3D(FVector(Scale3D)*DrawScale);
     if(StaticMeshComponent&&StaticMeshComponent->StaticMesh)
     {
         if(UStaticMesh* StaticMesh = CastChecked<UStaticMesh>(StaticMeshComponent->StaticMesh->ExportToContent(),ECastCheckedType::NullAllowed))

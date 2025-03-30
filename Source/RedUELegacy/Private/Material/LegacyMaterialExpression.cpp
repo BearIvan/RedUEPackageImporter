@@ -213,7 +213,9 @@ void ULegacyMaterialExpression::Export(UMaterial* OutMaterial, ULegacyMaterial3*
 	SetExpressionInput("DiffusePower", InMaterial->DiffusePower);
 	SetExpressionInput("Specular", InMaterial->SpecularColor);
 	SetExpressionInput("SpecularPower", InMaterial->SpecularPower);
+	ExpressionParameters.IsNormalMap = true;
 	SetExpressionInput("Normal", InMaterial->Normal);
+	ExpressionParameters.IsNormalMap = false;
 	SetExpressionInput("EmissiveColor", InMaterial->EmissiveColor);
 	SetExpressionInput("Opacity", InMaterial->Opacity);
 	SetExpressionInput("OpacityMask", InMaterial->OpacityMask);
@@ -244,7 +246,21 @@ void ULegacyMaterialExpression::Export(UMaterial* OutMaterial, ULegacyMaterial3*
 		SetExpressionInput("TextureDeformer1", InMaterial->TextureDeformer1);
 	}
 		ExpressionParameters.IsTextureDeformer = false;
-
+	for (ULegacyMaterialExpression*InExpression : InMaterial->Expressions)
+	{
+		if (InExpression&&!InExpression->CurrentExpression)
+		{
+			if (ULegacyMaterialExpressionTextureBase*ExpressionTextureBase =  Cast<ULegacyMaterialExpressionTextureBase>(InExpression))
+			{
+				ExpressionTextureBase->CreateExpression(OutMaterial, ExpressionParameters);
+			}
+			else if (ULegacyMaterialExpressionParameter*ExpressionParameter=  Cast<ULegacyMaterialExpressionParameter>(InExpression))
+			{
+				ExpressionParameter->CreateExpression(OutMaterial, ExpressionParameters);
+			}
+		}
+	}
+	
 	Expression->PostEditChange();
 	Expression->Modify();
 }
@@ -301,6 +317,11 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameter2D::CreateEx
 		CurrentExpression = Expression;
 	}
 	return CurrentExpression;
+}
+
+UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameterNormal::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
+{
+	return Super::CreateExpression(Material, Parameters);
 }
 
 UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameterCube::CreateExpression(UMaterial* Material, const FLegacyMaterialExpressionParameters& Parameters)
@@ -386,6 +407,48 @@ UMaterialExpression* ULegacyMaterialExpressionStaticSwitchParameter::CreateExpre
 				Expression->B.Expression = ExpressionConstant;
 			}
 		}
+		// else if (Parameters.IsNormalMap)
+		// {
+		// 	if (!A.Expression)
+		// 	{
+		// 		UMaterialExpressionConstant3Vector* ExpressionConstant = CreateExpressionTyped<UMaterialExpressionConstant3Vector>(Material);
+		// 		ExpressionConstant->Desc = GetLegacyFullName();
+		// 		ExpressionConstant->PostEditChange();
+		// 		ExpressionConstant->Modify();
+		// 		ExpressionConstant->Constant = {0,0,1};
+		// 		Expression->A.Expression = ExpressionConstant;
+		// 	}
+		// 	if (!B.Expression)
+		// 	{
+		// 		UMaterialExpressionConstant3Vector* ExpressionConstant = CreateExpressionTyped<UMaterialExpressionConstant3Vector>(Material);
+		// 		ExpressionConstant->Desc = GetLegacyFullName();
+		// 		ExpressionConstant->PostEditChange();
+		// 		ExpressionConstant->Modify();
+		// 		ExpressionConstant->Constant = {0,0,1};
+		// 		Expression->B.Expression = ExpressionConstant;
+		// 	}
+		// }
+		// else
+		// {
+		// 	if (!A.Expression)
+		// 	{
+		// 		UMaterialExpressionConstant* ExpressionConstant = CreateExpressionTyped<UMaterialExpressionConstant>(Material);
+		// 		ExpressionConstant->Desc = GetLegacyFullName();
+		// 		ExpressionConstant->PostEditChange();
+		// 		ExpressionConstant->Modify();
+		// 		ExpressionConstant->R = 0;
+		// 		Expression->A.Expression = ExpressionConstant;
+		// 	}
+		// 	if (!B.Expression)
+		// 	{
+		// 		UMaterialExpressionConstant* ExpressionConstant = CreateExpressionTyped<UMaterialExpressionConstant>(Material);
+		// 		ExpressionConstant->Desc = GetLegacyFullName();
+		// 		ExpressionConstant->PostEditChange();
+		// 		ExpressionConstant->Modify();
+		// 		ExpressionConstant->R = 0;
+		// 		Expression->B.Expression = ExpressionConstant;
+		// 	}
+		// }
 		Expression->PostEditChange();
 		Expression->Modify();
 		CurrentExpression = Expression;

@@ -252,7 +252,7 @@ public:
     virtual void                    SetStopper          (int32 Pos) override;
     virtual void                    PushStopper         () override;
     virtual void                    PopStopper          () override;
-    
+	
 	ULegacyObject*                  GetOrCreateImport	(int32 Index);
     ULegacyObject*                  GetOrCreateExport   (int32 Index);
 	FName							GetObjectPackageName(int PackageIndex) const;
@@ -304,6 +304,10 @@ public:
     bool							bIsLoaded = false;
     FString                         FileName;
 
+
+	UFUNCTION(BlueprintCallable,Category="Legacy")
+	ULegacyObject* FindOrCreateExport(FName Name);
+	
     UPROPERTY(BlueprintReadOnly)
     ERedUELegacyGameType GameType;
     

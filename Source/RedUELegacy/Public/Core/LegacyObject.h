@@ -15,16 +15,24 @@ public:
 	virtual void        LegacySerializeComponent    (FArchive& Ar) { }
     virtual bool        IsAComponent                () { return false; }
     virtual void        LegacySerializeUnrealProps  (UStruct* Type, void*Object,FRedUELegacyArchive& Ar);
-    virtual UObject*    ExportToContent             ();
-            FString     GetLegacyFullName           () const;
-            FString     GetLegacyName				() const;
-            FName	    GetLegacyFName				() const;
     
     int32           LegacyPackageIndex = INDEX_NONE;
     int64			LegacyObjectFlags;
     int32			NetIndex;
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable,Category="Legacy")
+	virtual UObject* ExportToContent();
+	
+	UFUNCTION(BlueprintCallable,Category="Legacy")
+	FString GetLegacyFullName() const;
+	
+	UFUNCTION(BlueprintCallable,Category="Legacy")
+	FString GetLegacyName() const;
+	
+	UFUNCTION(BlueprintCallable,Category="Legacy")
+	FName GetLegacyFName() const;
+	
+	UFUNCTION(BlueprintCallable,Category="Legacy")
 	FString GetOutContentPath() const;
 	
     UFUNCTION(BlueprintNativeEvent)
@@ -33,9 +41,9 @@ public:
     UFUNCTION(BlueprintNativeEvent)
     FName GetLegacyClassName(ERedUELegacyEngineType EngineType,ERedUELegacyGameType GameType);
     
-    UPROPERTY(Transient,BlueprintReadOnly)
+    UPROPERTY(Transient,BlueprintReadOnly,Category="Legacy")
     ULegacyPackage* LegacyPackage;
 
-	UPROPERTY(Transient,BlueprintReadOnly)
+	UPROPERTY(Transient,BlueprintReadOnly,Category="Legacy")
 	UObject* PresentObject = nullptr;
 };

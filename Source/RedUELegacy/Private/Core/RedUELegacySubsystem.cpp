@@ -85,6 +85,12 @@ void URedUELegacySubsystem::Initialize(ERedUELegacyEngineType InCurrentEngineTyp
     {
         GetPackage(TEXT("RvGame"));
     }
+    if(CurrentGameType == ERedUELegacyGameType::Bioshock3)
+    {
+        GetPackage(TEXT("Master_P"));
+        GetPackage(TEXT("DLCB_Master_P"));
+        GetPackage(TEXT("dlcb_CoalescedItems"));
+    }
 }
 
 
@@ -117,22 +123,25 @@ ULegacyPackage* URedUELegacySubsystem::GetPackage(const FString& FileName)
     const FString Extensions[] = {TEXT(".xxx"),TEXT(".upk")};
     for(const FString&Extension:Extensions)
     {
-        if(FPaths::FileExists(FPaths::Combine(InContentPath,FileName+Extension)))
+        for (const FString&InContentPath:InContentPaths)
         {
-            ULegacyPackage *NewPackage  = NewObject<ULegacyPackage>(this,ULegacyPackage::StaticClass(),*FileName);
-            NewPackage->LoadPackage(*(FileName+Extension));
-            if(CurrentEngineType==ERedUELegacyEngineType::Unkown)
+            if(FPaths::FileExists(FPaths::Combine(InContentPath,FileName+Extension)))
             {
-                Initialize(NewPackage->EngineType,NewPackage->GameType);
+                ULegacyPackage *NewPackage  = NewObject<ULegacyPackage>(this,ULegacyPackage::StaticClass(),*FileName);
+                NewPackage->LoadPackage(*(FileName+Extension));
+                if(CurrentEngineType==ERedUELegacyEngineType::Unkown)
+                {
+                    Initialize(NewPackage->EngineType,NewPackage->GameType);
+                }
+                else if(NewPackage->EngineType!=CurrentEngineType||NewPackage->GameType!=CurrentGameType)
+                {
+                    ensure(false);
+                    NewPackage->MarkAsGarbage();
+                    return nullptr;
+                }
+                Packages.Add(FileName,NewPackage);
+                return NewPackage;
             }
-            else if(NewPackage->EngineType!=CurrentEngineType||NewPackage->GameType!=CurrentGameType)
-            {
-                ensure(false);
-                NewPackage->MarkAsGarbage();
-                return nullptr;
-            }
-            Packages.Add(FileName,NewPackage);
-            return NewPackage;
         }
     }
     return nullptr;

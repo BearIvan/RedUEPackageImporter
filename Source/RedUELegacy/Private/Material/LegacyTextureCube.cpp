@@ -4,7 +4,6 @@
 #include "Material/LegacyTextureCube.h"
 
 #include "PackageTools.h"
-#include "RedImage.h"
 #include "RedImage.hpp"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Material/LegacyTexture2D.h"

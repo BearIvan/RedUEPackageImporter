@@ -6,6 +6,7 @@
 /**
  * 
  */
+class ULegacyTexture2D;
 UCLASS()
 class REDUELEGACY_API ULegacyTextureCube : public ULegacyTexture3
 {

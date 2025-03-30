@@ -25,15 +25,17 @@ FSingularityTextureFileCacheInfo* USingularityTextureFileCache::Get(const FGuid&
 
 void USingularityTextureFileCache::Load()
 {
-	FString Path = FPaths::Combine( GetTypedOuter<URedUELegacySubsystem>()->InContentPath,TEXT("coalesced.tfc"));
-	if(FArchive *TFCReader = IFileManager::Get().CreateFileReader(*Path))
+	for (const FString&InContentPath :GetTypedOuter<URedUELegacySubsystem>()->InContentPaths)
 	{
-		TFCReader->Seek(0x4AD50000);
-		(*TFCReader) << TFCTextureMap;
-		delete TFCReader;
+		FString Path = FPaths::Combine( InContentPath,TEXT("coalesced.tfc"));
+		if(FArchive *TFCReader = IFileManager::Get().CreateFileReader(*Path))
+		{
+			TFCReader->Seek(0x4AD50000);
+			(*TFCReader) << TFCTextureMap;
+			delete TFCReader;
+			return;
+		}
 	}
-	else
-	{
-		bFailed = true;
-	}
+	bFailed = true;
+	
 }

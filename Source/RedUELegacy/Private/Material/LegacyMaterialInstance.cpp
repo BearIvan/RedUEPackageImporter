@@ -172,7 +172,7 @@ UObject* ULegacyMaterialInstance::ExportToContent()
 			
 		}
 		
-		Material->Parent = CastChecked<UMaterialInterface>( Parent->ExportToContent());
+		Material->Parent = CastChecked<UMaterialInterface>( Parent->ExportToContent(),ECastCheckedType::NullAllowed);
 		Material->UpdateStaticPermutation(NewStaticParameterSet);
 		Material->InitStaticPermutation();
 		Material->PostEditChange();

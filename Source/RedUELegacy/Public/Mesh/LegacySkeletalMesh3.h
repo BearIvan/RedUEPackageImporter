@@ -144,11 +144,50 @@ struct FLegacySkeletalMeshChunk3
 };
 
 
+struct FLegacySkeletalMeshIndexBuffer3
+{
+	TArray<uint16>		Indices16;
+	TArray<uint32>		Indices32;
+
+	FORCEINLINE bool Is32Bit() const
+	{
+		return (Indices32.Num() != 0);
+	}
+
+	friend FRedUELegacyArchive& operator<<(FRedUELegacyArchive &Ar, FLegacySkeletalMeshIndexBuffer3 &I)
+	{
+		uint8 ItemSize = 2;
+
+		if (Ar.LegacyVer >= 806)
+		{
+			int32		f0;
+			Ar << f0 << ItemSize;
+		}
+		if (ItemSize == 2)
+		{
+			Ar<<I.Indices16;
+		}
+		else
+		{
+			check (ItemSize == 4);
+			Ar<<I.Indices32;
+		}
+
+		int32 unk;
+		if (Ar.LegacyVer < 297) Ar << unk;
+
+		return Ar;
+	}
+};
+
 struct FLegacySkeletalMeshLODModel3
 {
 	TArray<FLegacySkeletalMeshSection3> Sections;
 	TArray<FLegacySkeletalMeshChunk3>	Chunks;
+	FLegacySkeletalMeshIndexBuffer3		IndexBuffer;
 };
+
+
 
 UCLASS()
 class REDUELEGACY_API ULegacySkeletalMesh3 : public ULegacyObject

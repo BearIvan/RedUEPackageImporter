@@ -13,7 +13,7 @@ class ULegacyObject;
 /**
  * 
  */
-UCLASS(Transient)
+UCLASS(Transient,BlueprintType)
 class REDUELEGACY_API URedUELegacySubsystem : public UEditorSubsystem
 {
     GENERATED_BODY()
@@ -26,8 +26,10 @@ public:
     void            Initialize				(ERedUELegacyEngineType CurrentEngineType, ERedUELegacyGameType CurrentGameType);
     ULegacyObject*  CreateObject            (FName ObjectName,FName ClassName, ULegacyPackage*FromPackage);
     bool            IsKnownClass            (FName ClassName);
-	ULegacyPackage*	GetPackage				(const FString&Name);
     int32           ObjectsBeginLoadCount = 0;
+
+	UFUNCTION(BlueprintCallable)
+	ULegacyPackage*	GetPackage(const FString&Name);
     
     UPROPERTY(Transient)
     TMap<FString,ULegacyPackage*> Packages;
@@ -41,10 +43,10 @@ public:
 	UPROPERTY(Transient)
 	class USingularityTextureFileCache* SingularityTextureFileCache = nullptr;
 	
-	UPROPERTY(Transient)
-	FString InContentPath;
+	UPROPERTY(Transient,BlueprintReadWrite)
+	TArray<FString> InContentPaths;
 	
-	UPROPERTY(Transient)
+	UPROPERTY(Transient,BlueprintReadWrite)
 	FString OutContentPath;
 
 	UPROPERTY(Transient)
