@@ -1,18 +1,15 @@
-﻿// Tyran
-
-
-#include "World/Actors/LegacyActor.h"
+﻿#include "World/Actors/LegacyActor.h"
 
 #include "Core/RedUELegacyArchive.h"
 
-void ULegacyActor::Spawn_Implementation()
+AActor* ULegacyActor::Spawn_Implementation()
 {
-}
-
-bool FLegacyRotator::Serialize(FArchive& Ar)
-{
-	Ar << Pitch << Yaw << Roll;
-	return true;
+	ensure(PresentObject == nullptr);
+	AActor* Actor = GWorld->SpawnActor<AActor>(GetActorClass(),FVector(Location),FRotator(Rotation));
+	Actor->SetActorScale3D(FVector(DrawScale3D)*DrawScale);
+	FillActor(Actor);
+	PresentObject = Actor;
+	return Actor;
 }
 
 void ULegacyActor::LegacySerialize(FRedUELegacyArchive& Ar)
@@ -20,10 +17,16 @@ void ULegacyActor::LegacySerialize(FRedUELegacyArchive& Ar)
 	Super::LegacySerialize(Ar);
 	if (Ar.Game == ERedUELegacyGame::Bioshock3)
 	{
-		Rotation.Yaw = XPrivateLocalRotation.Yaw*(180.f / 32768.f);
-		Rotation.Roll = XPrivateLocalRotation.Roll*(180.f / 32768.f);
-		Rotation.Pitch = XPrivateLocalRotation.Pitch*(180.f / 32768.f);
-		Translation = XPrivateLocalLocation;
-		Scale3D = DrawScale3D;
+		Rotation = XPrivateLocalRotation;
+		Location = XPrivateLocalLocation;
 	}
+}
+
+void ULegacyActor::FillActor_Implementation(AActor* InActor)
+{
+}
+
+UClass* ULegacyActor::GetActorClass_Implementation()
+{
+	return AActor::StaticClass();
 }

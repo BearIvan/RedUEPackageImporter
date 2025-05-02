@@ -10,8 +10,9 @@ class REDUELEGACY_API ULegacyPrefabInstance : public ULegacyActor
 
 public:
     virtual void LegacySerialize(FRedUELegacyArchive& Ar) override;
-    virtual void Spawn_Implementation() override;
-    
+    virtual AActor* Spawn_Implementation() override;
+    virtual void LegacyPostLoad() override;
+
     UPROPERTY(BlueprintReadWrite)
     class ULegacyPrefab* TemplatePrefab;
     

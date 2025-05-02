@@ -2,6 +2,36 @@
 #include "LegacyObject.generated.h"
 
 
+USTRUCT(Blueprintable)
+struct FLegacyRotator
+{
+	GENERATED_BODY()
+
+	bool Serialize(FArchive& Ar);
+	operator FRotator3f();
+	operator FRotator();
+	FLegacyRotator&operator=(const FRotator3f& Rotator);
+	INT Pitch; // Looking up and down (0=Straight Ahead, +Up, -Down).
+	INT Yaw;   // Rotating around (running in circles), 0=East, +North, -South.
+	INT Roll;  // Rotation about axis of screen, 0=Straight, +Clockwise, -CCW.
+};
+
+inline FArchive& operator<<(FArchive& Ar, FLegacyRotator& R)
+{
+	R.Serialize(Ar);
+	return Ar;
+}
+
+template <>
+struct TStructOpsTypeTraits<FLegacyRotator> : public TStructOpsTypeTraitsBase2<FLegacyRotator>
+{
+	enum
+	{
+		WithSerializer = true
+	};
+};
+
+
 class ULegacyPackage;
 class FRedUELegacyArchive;
 

@@ -3,10 +3,14 @@
 #include "Actors/MaterialInstanceActor/RedMaterialInstanceActor.h"
 #include "Material/LegacyMaterialInstance.h"
 
-void ULegacyMaterialInstanceActor::Spawn_Implementation()
+void ULegacyMaterialInstanceActor::FillActor_Implementation(AActor* InActor)
 {
-	ARedMaterialInstanceActor* RedMaterialInstanceActor = GWorld->SpawnActor<ARedMaterialInstanceActor>(FVector(Translation),FRotator(Rotation));
-	RedMaterialInstanceActor->SetActorScale3D(FVector(Scale3D));
-	RedMaterialInstanceActor->MaterialInstance = Cast<UMaterialInstanceConstant>(MatInst->ExportToContent());
-	PresentObject = RedMaterialInstanceActor;
+	Super::FillActor_Implementation(InActor);
+	ARedMaterialInstanceActor* RedMaterialInstance = CastChecked<ARedMaterialInstanceActor>(InActor);
+	RedMaterialInstance->MaterialInstance = Cast<UMaterialInstanceConstant>(MatInst->ExportToContent());
+}
+
+UClass* ULegacyMaterialInstanceActor::GetActorClass_Implementation()
+{
+	return ARedMaterialInstanceActor::StaticClass();
 }

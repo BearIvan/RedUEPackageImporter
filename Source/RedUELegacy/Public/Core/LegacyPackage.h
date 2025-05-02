@@ -230,7 +230,21 @@ struct FRedUELegacyByteBulkData
 protected:
     void SerializeDataChunk(FArchive &Ar);
 };
+struct FRedUELegacyWordBulkData : public FRedUELegacyByteBulkData
+{
+	virtual int GetElementSize() const
+	{
+		return 2;
+	}
+};
 
+struct FRedUELegacyIntBulkData : public FRedUELegacyByteBulkData
+{
+	virtual int GetElementSize() const
+	{
+		return 4;
+	}
+};
 UCLASS(BlueprintType)
 class REDUELEGACY_API ULegacyPackage:public UObject,public FRedUELegacyArchive
 {

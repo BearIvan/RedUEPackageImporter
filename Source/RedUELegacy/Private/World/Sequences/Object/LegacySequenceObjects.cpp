@@ -65,7 +65,7 @@ UK2Node* ULegacySeqEvent_LevelLoaded::ExportToBlueprint(UBlueprint* InBlueprint,
 	NewEventNode->OnUpdateCommentText(GetLegacyFullName());
 	UEdGraphSchema_K2::SetNodeMetaData(NewEventNode, FNodeMetadata::DefaultGraphNode);
 	InGraph->AddNode(NewEventNode);
-	if(ensure(OutputLinks.Num()==1))
+	if(ensure(OutputLinks.Num()==1||OutputLinks.Num()==3))
 	{
 		check(OutputLinks[0].Links.Num() == 1);
 		if(OutputLinks[0].Links[0].LinkedOp)
@@ -217,4 +217,10 @@ UEdGraphPin* USeqAct_ToggleCinematicMode::GetPinOrCreateNode(UBlueprint* InBluep
 	UEdGraphPin* Result =  CurrentNode->FindPin(*InputLinks[InputLinkIdx].LinkDesc);
 	ensure(Result);
 	return Result;
+}
+
+UEdGraphPin* ULegacySeqAct_Interp::GetPinOrCreateNode(UBlueprint* InBlueprint, UEdGraph* InGraph, int32 InputLinkIdx)
+{
+	return nullptr;
+	//return Super::GetPinOrCreateNode(InBlueprint, InGraph, InputLinkIdx);
 }

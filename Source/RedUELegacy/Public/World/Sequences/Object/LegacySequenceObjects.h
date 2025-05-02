@@ -372,3 +372,24 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	FName mEndWeapon;
 };
+
+
+UCLASS()
+class REDUELEGACY_API ULegacySeqAct_Interp : public ULegacySequenceAction
+{
+	GENERATED_BODY()
+public:
+	
+	virtual UEdGraphPin* 	GetPinOrCreateNode	(UBlueprint* InBlueprint,UEdGraph* InGraph,int32 InputLinkIdx) override;
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyInterpData : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	
+	UPROPERTY(BlueprintReadWrite)
+	ULegacyObject* ObjValue;
+	
+};

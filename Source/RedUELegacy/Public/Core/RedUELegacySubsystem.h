@@ -31,6 +31,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	ULegacyPackage*	GetPackage(const FString&Name);
     
+	UFUNCTION(BlueprintCallable)
+	void Clear();
+	
+	UFUNCTION(BlueprintCallable)
+	void ToCacheSkeletons();
+	
     UPROPERTY(Transient)
     TMap<FString,ULegacyPackage*> Packages;
     
@@ -51,6 +57,10 @@ public:
 
 	UPROPERTY(Transient)
 	TSet<FName> CacheNoFoundClasses;
+	
+	UPROPERTY(Transient)
+	TArray<USkeleton*> Skeletons;
+	
 	
     ERedUELegacyGameType CurrentGameType = ERedUELegacyGameType::Unkown;
     ERedUELegacyEngineType CurrentEngineType = ERedUELegacyEngineType::Unkown;

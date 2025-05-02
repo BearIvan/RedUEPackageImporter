@@ -1,20 +1,17 @@
 ﻿#pragma once
 
 #include "LegacyActor.h"
-#include "LegacyMaterialInstanceActor.generated.h"
+#include "LegacySkeletalMeshActor.generated.h"
 
-/**
- * 
- */
 UCLASS()
-class REDUELEGACY_API ULegacyMaterialInstanceActor : public ULegacyActor
+class REDUELEGACY_API ULegacySkeletalMeshActor : public ULegacyActor
 {
 	GENERATED_BODY()
 public:
+
 	virtual void FillActor_Implementation(AActor* InActor) override;
 	virtual UClass* GetActorClass_Implementation() override;
-
+    
 	UPROPERTY(BlueprintReadWrite)
-	class ULegacyMaterialInstanceConstant* MatInst;
-	
+	class ULegacySkeletalMeshComponent* SkeletalMeshComponent;
 };

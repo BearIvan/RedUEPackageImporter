@@ -10,9 +10,14 @@ void ULegacyPrefabInstance::LegacySerialize(FRedUELegacyArchive& Ar)
     Ar.Seek(Ar.GetStopper());
 }
 
-void ULegacyPrefabInstance::Spawn_Implementation()
+AActor* ULegacyPrefabInstance::Spawn_Implementation()
 {
-    Super::Spawn_Implementation();
+    return nullptr;
+}
+
+void ULegacyPrefabInstance::LegacyPostLoad()
+{
+    Super::LegacyPostLoad();
     for(auto&[Key,Value]:ArchetypeToInstanceMap)
     {
         if(const ULegacyStaticMeshActor* TemplateLegacyStaticMeshActor = Cast<ULegacyStaticMeshActor>(Key))
@@ -22,5 +27,4 @@ void ULegacyPrefabInstance::Spawn_Implementation()
             LevelLegacyStaticMeshActor->StaticMeshComponent->Materials = TemplateLegacyStaticMeshActor->StaticMeshComponent->Materials;
         }
     }
-    
 }

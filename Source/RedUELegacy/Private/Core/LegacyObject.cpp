@@ -2,10 +2,43 @@
 
 #include <zconf.h>
 
+#include "ToolContextInterfaces.h"
 #include "..\..\Public\Core\RedUELegacyArchive.h"
 #include "Core/LegacyPackage.h"
 #include "Core/LegacyTypeInfo.h"
 #include "Core/RedUELegacySubsystem.h"
+
+FLegacyRotator::operator FRotator()
+{
+	FRotator Rotation;
+	Rotation.Yaw =		Yaw*(180.f / 32768.f);
+	Rotation.Roll =		Roll*(180.f / 32768.f);
+	Rotation.Pitch =	Pitch*(180.f / 32768.f);
+	return Rotation;
+}
+
+FLegacyRotator& FLegacyRotator::operator=(const FRotator3f& Rotator)
+{
+	Yaw = FMath::FloorToInt32(Rotator.Yaw/180.f * 32768.f);
+	Roll = FMath::FloorToInt32(Rotator.Roll/180.f * 32768.f);
+	Pitch = FMath::FloorToInt32(Rotator.Pitch/180.f * 32768.f);
+	return *this;
+}
+
+FLegacyRotator::operator FRotator3f()
+{
+	FRotator3f Rotation;
+	Rotation.Yaw =		Yaw*(180.f / 32768.f);
+	Rotation.Roll =		Roll*(180.f / 32768.f);
+	Rotation.Pitch =	Pitch*(180.f / 32768.f);
+	return Rotation;
+}
+
+bool FLegacyRotator::Serialize(FArchive& Ar)
+{
+	Ar << Pitch << Yaw << Roll;
+	return true;
+}
 
 void ULegacyObject::LegacyPostLoad()
 {
@@ -487,6 +520,24 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
             			}
             		}
                 }
+            	else if(FIntProperty* IntProperty = CastField<FIntProperty>(ArrayProperty->Inner))
+            	{
+            		for(int32 Index = 0;Index<DataCount;Index++)
+            		{
+            			int32 Number;
+            			Ar<<Number;
+            			IntProperty->SetValue_InContainer(ArrayHelper.GetRawPtr(Index),Number);
+            		}
+            	}
+            	else if(FNameProperty* NameProperty = CastField<FNameProperty>(ArrayProperty->Inner))
+            	{
+            		for(int32 Index = 0;Index<DataCount;Index++)
+            		{
+            			FName InString;
+            			Ar << InString;
+            			NameProperty->SetValue_InContainer(ArrayHelper.GetRawPtr(Index),InString);
+            		}
+            	}
                 else
                 {
                     UE_LOG(LogRedUELegacy,Error, TEXT("PropertyArray %s has not support inner %s"), *Tag.Name.ToString(),*ArrayProperty->Inner->GetNameCPP());

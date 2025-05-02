@@ -12,7 +12,7 @@ class REDUELEGACY_API ULegacyStaticMeshCollectionActor : public ULegacyActor
 
 public:
     virtual void LegacySerialize(FRedUELegacyArchive& Ar) override;
-    virtual void Spawn_Implementation() override;
+    virtual AActor* Spawn_Implementation() override;
 
     UPROPERTY(BlueprintReadWrite)
     TArray<	ULegacyStaticMeshComponent*> StaticMeshComponents;

@@ -1,6 +1,7 @@
 ﻿
 #include "World/Actors/LegacyStaticMeshCollectionActor.h"
 
+#include "MaterialStatsCommon.h"
 #include "Core/RedUELegacyArchive.h"
 
 void ULegacyStaticMeshCollectionActor::LegacySerialize(FRedUELegacyArchive& Ar)
@@ -25,27 +26,17 @@ void ULegacyStaticMeshCollectionActor::LegacySerialize(FRedUELegacyArchive& Ar)
     }
 }
 
-void ULegacyStaticMeshCollectionActor::Spawn_Implementation()
+AActor* ULegacyStaticMeshCollectionActor::Spawn_Implementation()
 {
-    Super::Spawn_Implementation();
-    for (const ULegacyStaticMeshComponent*Component:StaticMeshComponents)
+    for (ULegacyStaticMeshComponent*Component:StaticMeshComponents)
     {
         if(Component&&Component->StaticMesh)
         {
-            FString Test = Component->GetLegacyFullName();
-            if(UStaticMesh* StaticMesh = CastChecked<UStaticMesh>(Component->StaticMesh->ExportToContent(),ECastCheckedType::NullAllowed))
-            {
-                AStaticMeshActor* StaticMeshActor = GWorld->SpawnActor<AStaticMeshActor>(FVector(Component->Translation),FRotator(Component->Rotation));
-                StaticMeshActor->SetActorScale3D(FVector(Component->Scale3D));
-                StaticMeshActor->GetStaticMeshComponent()->SetStaticMesh(StaticMesh);
-                for(int32  i = 0; i < Component->Materials.Num();i++)
-                {
-                    if(Component->Materials[i])
-                    {
-                        StaticMeshActor->GetStaticMeshComponent()->SetMaterial(i,CastChecked<UMaterialInterface>(Component->Materials[i]->ExportToContent(),ECastCheckedType::NullAllowed));
-                    }
-                }
-            }
+            AStaticMeshActor* StaticMeshActor = GWorld->SpawnActor<AStaticMeshActor>(FVector(Component->Translation),Component->Rotation);
+            StaticMeshActor->SetActorScale3D(FVector(Component->Scale3D));
+            Component->FillComponent(StaticMeshActor->GetStaticMeshComponent());
+            
         }
     }
+    return nullptr;
 }

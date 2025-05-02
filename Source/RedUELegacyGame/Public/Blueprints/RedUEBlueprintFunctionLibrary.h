@@ -18,6 +18,20 @@ enum class ERedUEToggleCinematicModeExec : uint8
 	Toggle,
 };
 
+
+UENUM(BlueprintType)
+enum class ELegacyXPlayScriptedSequenceThen : uint8
+{
+	Ready,
+	CleanedUp,
+};
+UENUM(BlueprintType)
+enum class ELegacyXPlayScriptedSequenceExec : uint8
+{
+	Initiate,
+	CleanUp,
+};
+
 USTRUCT(Blueprintable)
 struct FRedUEToggleCinematicModeParameters
 {
@@ -70,4 +84,8 @@ class REDUELEGACYGAME_API URedUEBlueprintFunctionLibrary : public UBlueprintFunc
 public:
 	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo="LatentInfo", WorldContext="WorldContextObject", ExpandEnumAsExecs="Then,Exec"), Category="Red|UELegacy")
 	static void ToggleCinematicMode(ERedUEToggleCinematicModeExec Exec,ERedUEToggleCinematicModeThen&Then, UObject* WorldContextObject, FLatentActionInfo LatentInfo ,const FRedUEToggleCinematicModeParameters&Parameters = FRedUEToggleCinematicModeParameters());
+
+	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo="LatentInfo", WorldContext="WorldContextObject", ExpandEnumAsExecs="Then,Exec"), Category="Red|UELegacy|Bioshock")
+	static void XPlayScriptedSequence(ELegacyXPlayScriptedSequenceExec Exec,ELegacyXPlayScriptedSequenceThen&Then, UObject* WorldContextObject, FLatentActionInfo LatentInfo ,const FRedUEToggleCinematicModeParameters&Parameters = FRedUEToggleCinematicModeParameters());
+
 };

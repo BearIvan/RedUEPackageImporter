@@ -3,6 +3,8 @@
 
 #include "Core/RedUELegacySubsystem.h"
 
+#include "PackageTools.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/LegacyObject.h"
 #include "Core/LegacyPackage.h"
 #include "Material/SingularityTextureFileCache.h"
@@ -41,12 +43,12 @@ void URedUELegacySubsystem::ObjectsEndLoad()
         {
             UE_LOG(LogRedUELegacy,Warning,TEXT("%s::LegacySerialize(%s): %lld unread bytes"),*InObject->GetClass()->GetName(), *InObject->GetName(), Package->GetStopper() - Package->Tell());
         }
-         
+        LoadedObjects.Add(InObject);
     }
     
     for (ULegacyObject*LoadedObject:LoadedObjects)
     {
-        LoadedObject->PostLoad();
+        LoadedObject->LegacyPostLoad();
     }
     
     ensure(ObjectsLoaded.Num() == 0);
@@ -145,4 +147,31 @@ ULegacyPackage* URedUELegacySubsystem::GetPackage(const FString& FileName)
         }
     }
     return nullptr;
+}
+
+void URedUELegacySubsystem::Clear()
+{
+    Packages.Empty();
+    ObjectsLoaded.Empty();
+    Classes.Empty();
+    CacheNoFoundClasses.Empty();
+    Skeletons.Empty();
+    CurrentEngineType = ERedUELegacyEngineType::Unkown;
+    CurrentGameType = ERedUELegacyGameType::Unkown;
+}
+
+void URedUELegacySubsystem::ToCacheSkeletons()
+{
+    Skeletons.Empty();
+    const FString PackageName = UPackageTools::SanitizePackageName(OutContentPath);
+    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+    TArray<FAssetData> AssetData;
+    AssetRegistryModule.Get().GetAssetsByPath(FName(*PackageName), AssetData, true);
+    for (FAssetData& Data : AssetData)
+    {
+        if (USkeleton* Skeleton = Cast<USkeleton>(Data.GetAsset()))
+        {
+            Skeletons.Add(Skeleton);
+        }
+    }
 }

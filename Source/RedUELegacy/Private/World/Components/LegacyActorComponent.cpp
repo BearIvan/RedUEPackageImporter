@@ -9,3 +9,7 @@ void ULegacyActorComponent::LegacySerializeComponent(FArchive& Ar)
     UObject* TemplateOwnerClass;
     Ar<<TemplateOwnerClass;
 }
+
+void ULegacyActorComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
+{
+}
