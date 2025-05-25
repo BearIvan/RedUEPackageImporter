@@ -15,3 +15,16 @@ public:
     class ULegacyStaticMeshComponent* StaticMeshComponent;
 
 };
+
+UCLASS()
+class REDUELEGACY_API ULegacyXReactiveDynamicSMActor : public ULegacyStaticMeshActor
+{
+    GENERATED_BODY()
+public:
+};
+UCLASS()
+class REDUELEGACY_API ULegacyXReactiveInterpActor : public ULegacyXReactiveDynamicSMActor
+{
+    GENERATED_BODY()
+public:
+};

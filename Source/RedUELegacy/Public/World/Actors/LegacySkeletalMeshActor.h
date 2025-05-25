@@ -15,3 +15,10 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	class ULegacySkeletalMeshComponent* SkeletalMeshComponent;
 };
+
+UCLASS()
+class REDUELEGACY_API ULegacyXReactiveSkeletalMeshActor : public ULegacySkeletalMeshActor
+{
+	GENERATED_BODY()
+public:
+};

@@ -48,7 +48,7 @@ FRedUELegacyArchive& operator<<(FRedUELegacyArchive& Ar, FString& Value)
     }
     else
     {
-        if (GameUsesFCompactIndex(Ar))
+        if (Ar.GameUsesFCompactIndex())
             Ar << AR_INDEX(len);
         else
             Ar << len;

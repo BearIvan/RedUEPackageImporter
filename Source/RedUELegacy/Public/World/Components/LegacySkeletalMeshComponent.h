@@ -15,10 +15,17 @@ public:
 	ULegacyObject* SkeletalMesh;;
 
 	UPROPERTY(BlueprintReadWrite)
-	TArray<ULegacyMaterialInterface*>	Materials;
+	TArray<class ULegacyMaterialInterface*>	Materials;
 
 	UPROPERTY(BlueprintReadWrite)
 	TArray<class ULegacyAnimSet*> AnimSets;
 
 	
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXSkeletalMeshComponent : public ULegacySkeletalMeshComponent
+{
+	GENERATED_BODY()
+public:
 };

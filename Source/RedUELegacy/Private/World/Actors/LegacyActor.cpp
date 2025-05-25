@@ -1,6 +1,7 @@
 ﻿#include "World/Actors/LegacyActor.h"
 
 #include "Core/RedUELegacyArchive.h"
+#include "World/Components/LegacySkeletalMeshComponent.h"
 
 AActor* ULegacyActor::Spawn_Implementation()
 {
@@ -20,6 +21,26 @@ void ULegacyActor::LegacySerialize(FRedUELegacyArchive& Ar)
 		Rotation = XPrivateLocalRotation;
 		Location = XPrivateLocalLocation;
 	}
+}
+
+UClass* ULegacyCameraActor::GetActorClass_Implementation()
+{
+	return ACameraActor::StaticClass();
+}
+
+
+void ULegacyXMatineeCameraActor::FillActor_Implementation(AActor* InActor)
+{
+	Super::FillActor_Implementation(InActor);
+
+	ACameraActor* CameraActor = CastChecked<ACameraActor>(InActor);
+	
+	USkeletalMeshComponent* InSkeletalMeshComponent = NewObject< USkeletalMeshComponent>(CameraActor, NAME_None, RF_Transactional);
+	CameraActor->AddInstanceComponent(InSkeletalMeshComponent);
+	InSkeletalMeshComponent->AttachToComponent(CameraActor->GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	InSkeletalMeshComponent->OnComponentCreated();
+	InSkeletalMeshComponent->RegisterComponent();
+	SkeletalMeshComponent->FillComponent(InSkeletalMeshComponent);
 }
 
 void ULegacyActor::FillActor_Implementation(AActor* InActor)

@@ -35,7 +35,11 @@ struct TStructOpsTypeTraits<FLegacyRotator> : public TStructOpsTypeTraitsBase2<F
 class ULegacyPackage;
 class FRedUELegacyArchive;
 
-UCLASS()
+enum ELegacyObjectFlags:int64
+{
+	RLF_NeedLoad = 0x0000020000000000,
+};
+UCLASS(BlueprintType)
 class REDUELEGACY_API ULegacyObject : public UObject
 {
 	GENERATED_BODY()
@@ -44,10 +48,11 @@ public:
     virtual void        LegacySerialize             (FRedUELegacyArchive& Ar);
 	virtual void        LegacySerializeComponent    (FArchive& Ar) { }
     virtual bool        IsAComponent                () { return false; }
-    virtual void        LegacySerializeUnrealProps  (UStruct* Type, void*Object,FRedUELegacyArchive& Ar);
+    virtual void        PreLegacySerializeUnrealProps	(FRedUELegacyArchive& Ar);
+    virtual void        LegacySerializeUnrealProps		(UStruct* Type, void*Object,FRedUELegacyArchive& Ar);
     
     int32           LegacyPackageIndex = INDEX_NONE;
-    int64			LegacyObjectFlags;
+    int64			LegacyObjectFlags = 0;
     int32			NetIndex;
 
 	UFUNCTION(BlueprintCallable,Category="Legacy")

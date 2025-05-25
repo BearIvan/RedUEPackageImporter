@@ -483,58 +483,8 @@ struct FLegacySkeletalMeshLODModel3
 	int NumUVSets;
 	TArray<FColor> VertexColor; // since version 710
 
-	friend FRedUELegacyArchive& operator<<(FRedUELegacyArchive& Ar, FLegacySkeletalMeshLODModel3& Lod)
-	{
-		Ar << Lod.Sections << Lod.IndexBuffer;
-		if (Ar.LegacyVer < 686) Ar << Lod.f68;
-		Ar << Lod.UsedBones;
-		if (Ar.LegacyVer < 686) Ar << Lod.f74;
-		if (Ar.LegacyVer >= 215)
-		{
-			Ar << Lod.Chunks << Lod.f80 << Lod.NumVertices;
-		}
-
-		if (Ar.LegacyVer < 686) Ar << Lod.Edges;
-		if (Ar.LegacyVer >= 207)
-		{
-			Ar << Lod.f24;
-		}
-		else
-		{
-			TArray<int16> f24_a;
-			Ar << f24_a;
-		}
-		if (Ar.LegacyVer >= 221)
-		{
-			if (Ar.LegacyVer < 806) Lod.BulkData.Serialize(Ar); // Bulk of uint16
-			else Lod.BulkData2.Serialize(Ar); // Bulk of int
-		}
-		if (Ar.Game == ERedUELegacyGame::Bioshock3)
-		{
-			int unkE4;
-			Ar << unkE4;
-		}
-
-		Lod.NumUVSets = 1;
-		if (Ar.LegacyVer >= 709)
-		{
-			Ar << Lod.NumUVSets;
-		}
-		if (Ar.LegacyVer >= 333)
-		{
-			Ar << Lod.GPUSkin;
-		}
-		if (Ar.LegacyVer >= 534) // post-UT3 code
-		{
-			Ar << Lod.ExtraVertexInfluences;
-		}
-		if (Ar.LegacyVer >= 841) // adjacency index buffer
-		{
-			FLegacySkeletalMeshIndexBuffer3 unk;
-			Ar << unk;
-		}
-		return Ar;
-	}
+	void Serialize(FRedUELegacyArchive& Ar, ULegacyObject* Owner, int32 Idx);
+	
 };
 
 struct VLegacyJointPos
@@ -607,4 +557,7 @@ private:
 public:
 	UPROPERTY(Transient)
 	TArray<ULegacyMaterialInterface*> Materials;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool bHasVertexColors;
 };

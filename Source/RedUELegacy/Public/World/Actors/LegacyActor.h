@@ -40,3 +40,23 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	float DrawScale = 1;
 };
+
+UCLASS()
+class REDUELEGACY_API ULegacyCameraActor : public ULegacyActor
+{
+	GENERATED_BODY()
+public:
+	virtual UClass* GetActorClass_Implementation() override;
+	
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXMatineeCameraActor : public ULegacyCameraActor
+{
+	GENERATED_BODY()
+public:
+	virtual void FillActor_Implementation(AActor* InActor) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	class ULegacySkeletalMeshComponent* SkeletalMeshComponent;
+};

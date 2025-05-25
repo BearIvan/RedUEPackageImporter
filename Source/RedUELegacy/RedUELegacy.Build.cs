@@ -54,7 +54,11 @@ public class RedUELegacy : ModuleRules
 				"RedImage",
                 "EditorSubsystem",
                 "RedUELegacyGame",
-                "BlueprintGraph"
+                "BlueprintGraph",
+                "KismetCompiler",
+                "AssetDefinition",
+                "Kismet",
+                "PropertyEditor"
                 // ... add private dependencies that you statically link with here ...	
 			}
 			);

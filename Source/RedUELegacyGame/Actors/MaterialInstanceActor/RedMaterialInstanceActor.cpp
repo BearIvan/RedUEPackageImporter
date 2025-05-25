@@ -1,7 +1,7 @@
 ﻿#include "Actors/MaterialInstanceActor/RedMaterialInstanceActor.h"
 
 
-ARedMaterialInstanceActor::ARedMaterialInstanceActor()
+ARedMaterialInstanceActor::ARedMaterialInstanceActor(): MaterialInstance(nullptr)
 {
 	PrimaryActorTick.bCanEverTick = false;
 }

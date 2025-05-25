@@ -21,7 +21,10 @@ void ULegacySkeletalMeshComponent::FillComponent_Implementation(UActorComponent*
 			}
 			for (ULegacyAnimSet*AnimSet:AnimSets)
 			{
-				AnimSet->ImportSequences(InSkeletalMesh->GetSkeleton());
+				if (AnimSet)
+				{
+					AnimSet->ImportSequences(InSkeletalMesh->GetSkeleton());
+				}
 			}
 		}
 		if (ULegacySkeletalMesh3*SkeletalMesh3 = Cast<ULegacySkeletalMesh3>(SkeletalMesh))

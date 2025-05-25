@@ -19,3 +19,27 @@ void ULegacyAnimSet::ImportSequences(USkeleton* Skeleton)
 		}
 	}
 }
+
+void ULegacyAnimSet::ReImportSequences(USkeleton* Skeleton)
+{
+	ImportedSequences.Empty();
+	ImportSequences(Skeleton);
+}
+
+void FLegacyMorphemeAnimRigToAnimMap::Unpack()
+{
+	m_rigIndices = reinterpret_cast<uint16*>(reinterpret_cast<uint8*>(this) + reinterpret_cast<int64>(m_rigIndices));
+}
+
+void ULegacyMorphemeAnimSet::LegacySerialize(FRedUELegacyArchive& Ar)
+{
+	Super::LegacySerialize(Ar);
+	CompiledRigDataPC32.Serialize(Ar);
+	CompiledRigDataPC64.Serialize(Ar);
+	CompiledRigDataX360.Serialize(Ar);
+	CompiledRigDataPS3.Serialize(Ar);
+	CompiledRigToAnimMapDataPC32.Serialize(Ar);
+	CompiledRigToAnimMapDataPC64.Serialize(Ar);
+	CompiledRigToAnimMapDataX360.Serialize(Ar);
+	CompiledRigToAnimMapDataPS3.Serialize(Ar);
+}

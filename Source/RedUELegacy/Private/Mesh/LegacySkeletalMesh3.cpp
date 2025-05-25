@@ -13,6 +13,68 @@
 #include "Rendering/SkeletalMeshModel.h"
 int32 FLegacyGPUVert3Common::GLegacyNumGPUUVSets = 1;
 
+void FLegacySkeletalMeshLODModel3::Serialize(FRedUELegacyArchive& Ar, ULegacyObject* Owner, int32 Idx)
+{
+	Ar << Sections << IndexBuffer;
+	if (Ar.LegacyVer < 686) Ar << f68;
+	Ar << UsedBones;
+	if (Ar.LegacyVer < 686) Ar << f74;
+	if (Ar.LegacyVer >= 215)
+	{
+		Ar << Chunks << f80 << NumVertices;
+	}
+
+	if (Ar.LegacyVer < 686) Ar << Edges;
+	if (Ar.LegacyVer >= 207)
+	{
+		Ar << f24;
+	}
+	else
+	{
+		TArray<int16> f24_a;
+		Ar << f24_a;
+	}
+	if (Ar.LegacyVer >= 221)
+	{
+		if (Ar.LegacyVer < 806) BulkData.Serialize(Ar); // Bulk of uint16
+		else BulkData2.Serialize(Ar); // Bulk of int
+	}
+	if (Ar.Game == ERedUELegacyGame::Bioshock3)
+	{
+		int unkE4;
+		Ar << unkE4;
+	}
+
+	NumUVSets = 1;
+	if (Ar.LegacyVer >= 709)
+	{
+		Ar << NumUVSets;
+	}
+	if (Ar.LegacyVer >= 333)
+	{
+		Ar << GPUSkin;
+	}
+	if (Ar.LegacyVer >= 710 )
+	{
+		if (ULegacySkeletalMesh3* SkeletalMesh = Cast<ULegacySkeletalMesh3>(Owner))
+		{
+			if (SkeletalMesh->bHasVertexColors)
+			{
+				Ar.LegacyBulkSerialize(VertexColor);
+			}
+		}
+	}
+	if (Ar.LegacyVer >= 534) // post-UT3 code
+	{
+		Ar << ExtraVertexInfluences;
+	}
+	if (Ar.LegacyVer >= 841) // adjacency index buffer
+	{
+		FLegacySkeletalMeshIndexBuffer3 unk;
+		Ar << unk;
+	}
+}
+
 ULegacySkeletalMesh3::ULegacySkeletalMesh3(): SkeletalDepth(0)
 {
 }
@@ -43,7 +105,7 @@ void ULegacySkeletalMesh3::LegacySerialize(FRedUELegacyArchive& Ar)
 	Ar << Materials;
 	Ar << MeshOrigin << RotOrigin;
 	Ar << RefSkeleton << SkeletalDepth;
-	Ar << LODModels;
+	Ar .LegacySerialize(LODModels,this);
 }
 
 struct FLegacySkeletalUV
@@ -306,7 +368,10 @@ UObject* ULegacySkeletalMesh3::ExportToContent()
 					if (!LegacyMaterial2Material.Contains(Section.MaterialIndex))
 					{
 						SkeletalMeshImportData::FMaterial Material;
-						Material.Material =  CastChecked<UMaterialInterface>(Materials[Section.MaterialIndex]->ExportToContent(),ECastCheckedType::NullAllowed);
+						if (Materials[Section.MaterialIndex])
+						{
+							Material.Material =  CastChecked<UMaterialInterface>(Materials[Section.MaterialIndex]->ExportToContent(),ECastCheckedType::NullAllowed);
+						}
 						Material.MaterialImportName = *FString::Printf(TEXT("Mat_%d"),Section.MaterialIndex);
 						int32 MaterialID = InSkeletalMeshImportData.Materials.Add(Material);
 						LegacyMaterial2Material.Add(Section.MaterialIndex,MaterialID);
@@ -408,7 +473,10 @@ UObject* ULegacySkeletalMesh3::ExportToContent()
 		for (ULegacyMaterialInterface*LegacyMaterial : Materials)
 		{
 			FSkeletalMaterial& SkeletalMaterial = OutSekeletalMaterials.AddDefaulted_GetRef();
-			SkeletalMaterial.MaterialInterface = CastChecked<UMaterialInterface>(LegacyMaterial->ExportToContent(),ECastCheckedType::NullAllowed);
+			if (LegacyMaterial)
+			{
+				SkeletalMaterial.MaterialInterface = CastChecked<UMaterialInterface>(LegacyMaterial->ExportToContent(),ECastCheckedType::NullAllowed);
+			}
 			SkeletalMaterial.MaterialSlotName = *FString::Printf(TEXT("Mat_%d"),OutSekeletalMaterials.Num()-1);
 		}
 		SkeletalMesh->SetMaterials(OutSekeletalMaterials);
@@ -527,7 +595,7 @@ bool ULegacySkeletalMesh3::CreateSkeletalMesh(USkeletalMesh* SkeletalMesh, TArra
 	FSkeletalMeshModel* ImportedResource = SkeletalMesh->GetImportedModel();
 	ImportedResource->LODModels.Empty();
 	SkeletalMesh->ResetLODInfo();
-	bool bHasVertexColors = false;
+	bool HasVertexColors = false;
 
 
 	for (int32 LODIndex = 0; LODIndex < LODIndexToSkeletalMeshImportData.Num(); ++LODIndex)
@@ -545,7 +613,7 @@ bool ULegacySkeletalMesh3::CreateSkeletalMesh(USkeletalMesh* SkeletalMesh, TArra
 		NewLODInfo.ReductionSettings.MaxDeviationPercentage = 0.0f;
 		NewLODInfo.LODHysteresis = 0.02f;
 
-		bHasVertexColors |= LODImportData.bHasVertexColors;
+		HasVertexColors |= LODImportData.bHasVertexColors;
 
 		LODModel.NumTexCoords = FMath::Max<uint32>(1, LODImportData.NumTexCoords);
 
@@ -603,7 +671,7 @@ bool ULegacySkeletalMesh3::CreateSkeletalMesh(USkeletalMesh* SkeletalMesh, TArra
 	}
 
 	SkeletalMesh->SetImportedBounds(FBoxSphereBounds((FBox)BoundingBox));
-	SkeletalMesh->SetHasVertexColors(bHasVertexColors);
+	SkeletalMesh->SetHasVertexColors(HasVertexColors);
 	SkeletalMesh->SetVertexColorGuid(SkeletalMesh->GetHasVertexColors() ? FGuid::NewGuid() : FGuid());
 	SkeletalMesh->CalculateInvRefMatrices();
 

@@ -1,4 +1,4 @@
-﻿#include "Material/Expressions/RedSineRangeMaterialExpression.h"
+﻿#include "RedSineRangeMaterialExpression.h"
 #include "MaterialCompiler.h"
 
 URedSineRangeMaterialExpression::URedSineRangeMaterialExpression(const FObjectInitializer& ObjectInitializer):Super(ObjectInitializer)

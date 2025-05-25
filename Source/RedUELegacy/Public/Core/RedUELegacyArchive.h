@@ -1,6 +1,17 @@
 ﻿#pragma once
 #include "RedUELegacyGame.h"
 
+class ULegacyObject;
+
+class FRedUELegacyCompactIndex
+{
+public:
+    int32	Value;
+    friend FArchive& operator<<(FArchive &Ar, FRedUELegacyCompactIndex &I);
+};
+
+#define AR_INDEX(intref)	(*(FRedUELegacyCompactIndex*)&(intref))
+
 class FRedUELegacyArchive:public FArchive
 {
 public:
@@ -24,6 +35,29 @@ public:
             *this<<Array;
         }
     }
+    template<typename ElementType, typename AllocatorType>
+    void LegacySerialize(TArray<ElementType, AllocatorType>& A,ULegacyObject* Owner)
+    {
+        int32 SerializeNum;
+        if (GameUsesFCompactIndex())
+            (*this) << AR_INDEX(SerializeNum);
+        else
+            (*this) << SerializeNum;
+    
+        A.Empty(SerializeNum);
+        for (int32 i=0; i<SerializeNum; i++)
+        {
+            A.AddDefaulted_GetRef().Serialize(*this,Owner,i);
+        }
+    }
+
+    FORCEINLINE bool GameUsesFCompactIndex()
+    {
+        if (Game >= ERedUELegacyGame::UE3) return false;
+        if (Game == ERedUELegacyGame::UE2X && LegacyVer >= 145) return false;
+        return true;
+    }
+
     
 	void				DetectGame();
     virtual int32       GetStopper();
@@ -37,27 +71,13 @@ public:
     
 };
 
-class FRedUELegacyCompactIndex
-{
-public:
-    int32	Value;
-    friend FArchive& operator<<(FArchive &Ar, FRedUELegacyCompactIndex &I);
-};
 
-#define AR_INDEX(intref)	(*(FRedUELegacyCompactIndex*)&(intref))
-
-FORCEINLINE bool GameUsesFCompactIndex(const FRedUELegacyArchive &Ar)
-{
-    if (Ar.Game >= ERedUELegacyGame::UE3) return false;
-    if (Ar.Game == ERedUELegacyGame::UE2X && Ar.LegacyVer >= 145) return false;
-    return true;
-}
 
 template<typename ElementType, typename AllocatorType>
 FRedUELegacyArchive& operator<<(FRedUELegacyArchive& Ar, TArray<ElementType, AllocatorType>& A)
 {
     int32 SerializeNum;
-    if (GameUsesFCompactIndex(Ar))
+    if (Ar.GameUsesFCompactIndex())
         Ar << AR_INDEX(SerializeNum);
     else
         Ar << SerializeNum;

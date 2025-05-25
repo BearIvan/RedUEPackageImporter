@@ -8,5 +8,4 @@ class REDSINGULARITY_API ULegacyRSeqEvt_CheckpointActivated : public ULegacySequ
 	GENERATED_BODY()
 
 public:
-	virtual UK2Node* ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph) override;
 };

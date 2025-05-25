@@ -789,15 +789,11 @@ ULegacyObject* ULegacyPackage::GetOrCreateExport(int32 Index)
     {
         return Exp.Object;
     }
-    
-    if(Exp.ObjectName.ToString().StartsWith(TEXT("Default__")))
-    {
-       return nullptr;
-    }
 
     URedUELegacySubsystem*RedUELegacySubsystem =  GetTypedOuter<URedUELegacySubsystem>();
     const FName ClassName = GetObjectName(Exp.ClassIndex);
-    
+
+	
     Exp.Object = RedUELegacySubsystem->CreateObject(*GetFullExportName(Index),ClassName,this);
 
     if(!Exp.Object)
@@ -812,6 +808,29 @@ ULegacyObject* ULegacyPackage::GetOrCreateExport(int32 Index)
     	
         return nullptr;
     }
+    {
+    	ULegacyObject* Template = nullptr;
+    	if (Exp.Archetype != 0)
+    	{
+		
+    		if (Exp.Archetype < 0)
+    		{
+    			Template = GetOrCreateImport(-Exp.Archetype-1);
+    		}
+    		else if (Exp.Archetype > 0)
+    		{
+    			Template = GetOrCreateExport(Exp.Archetype-1);
+    		}
+    		ensure(Template);
+    		RedUELegacySubsystem->ObjectPreload(Template);
+    	}
+    	if (Template)
+    	{
+    		UEngine::FCopyPropertiesForUnrelatedObjectsParams Options;
+    		UEngine::CopyPropertiesForUnrelatedObjects(Template, Exp.Object, Options);
+    	}
+    }
+	
     RedUELegacySubsystem->ObjectsBeginLoad();
     ULegacyObject *CurrentOuter = nullptr;
     if (Exp.PackageIndex)
@@ -821,8 +840,14 @@ ULegacyObject* ULegacyPackage::GetOrCreateExport(int32 Index)
         if (!CurrentOuter)
         {
             FName OuterClassName = GetObjectName(OuterExp.ClassIndex);
-            if (RedUELegacySubsystem->IsKnownClass(OuterClassName))
-                CurrentOuter = GetOrCreateExport(Exp.PackageIndex - 1);
+        	if (OuterClassName != NAME_Package)
+        	{
+        		if (ensure(RedUELegacySubsystem->IsKnownClass(OuterClassName)))
+        		{
+        			CurrentOuter = GetOrCreateExport(Exp.PackageIndex - 1);
+        			ensure(CurrentOuter);
+        		}
+        	}
         }
     }
     if(CurrentOuter)
@@ -832,6 +857,7 @@ ULegacyObject* ULegacyPackage::GetOrCreateExport(int32 Index)
     Exp.Object->LegacyPackage = this;
     Exp.Object->LegacyPackageIndex = Index;
     Exp.Object->LegacyObjectFlags = Exp.ObjectFlags | static_cast<uint64>(Exp.ObjectFlags2) << 32ull;
+	Exp.Object->LegacyObjectFlags |= RLF_NeedLoad;
     RedUELegacySubsystem->ObjectsLoaded.Add(Exp.Object);
     RedUELegacySubsystem->ObjectsEndLoad();
     return Exp.Object;

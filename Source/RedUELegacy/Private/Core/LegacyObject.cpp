@@ -58,8 +58,11 @@ struct FPushedState
 
 void ULegacyObject::LegacySerialize(FRedUELegacyArchive& Ar)
 {
-    constexpr int64 RF_HasStack = 0x0200000000000000ull;
-    
+	constexpr int64 RF_HasStack = 0x0200000000000000ull;
+	// if (GetLegacyFullName() == TEXT("TheWorld.PersistentLevel.XReactiveSkeletalMeshActor2.XSkeletalMeshComponent0"))
+	// {
+	// 	__nop();
+	// }
     if (LegacyObjectFlags&RF_HasStack)
     {
         int32 Node;
@@ -107,7 +110,7 @@ void ULegacyObject::LegacySerialize(FRedUELegacyArchive& Ar)
     {
         return;
     }
-
+	PreLegacySerializeUnrealProps(Ar);
     LegacySerializeUnrealProps(GetClass(),this,Ar);
     
 }
@@ -280,6 +283,10 @@ struct FLegacyPropertyTag
 		return Ar;
 	}
 };
+
+void ULegacyObject::PreLegacySerializeUnrealProps(FRedUELegacyArchive& Ar)
+{
+}
 
 void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRedUELegacyArchive& Ar)
 {

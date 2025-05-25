@@ -8,5 +8,4 @@ class ULegacyXSeqAct_PlayScriptedSequence : public ULegacySequenceAction
 {
 	GENERATED_BODY()
 public:
-	virtual UEdGraphPin* 	GetPinOrCreateNode	(UBlueprint* InBlueprint,UEdGraph* InGraph,int32 InputLinkIdx);
 };

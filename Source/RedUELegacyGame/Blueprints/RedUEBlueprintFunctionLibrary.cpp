@@ -1,5 +1,4 @@
-﻿
-#include "Blueprints/RedUEBlueprintFunctionLibrary.h"
+﻿#include "RedUEBlueprintFunctionLibrary.h"
 
 class FRedUEToggleCinematicModeAction : public FPendingLatentAction
 {

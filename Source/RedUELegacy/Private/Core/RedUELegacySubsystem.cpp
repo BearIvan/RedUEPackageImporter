@@ -7,13 +7,38 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/LegacyObject.h"
 #include "Core/LegacyPackage.h"
+#include "Kismet/Base/SequenceAction.h"
 #include "Material/SingularityTextureFileCache.h"
+#include "World/Sequences/Object/LegacySequenceObjects.h"
 DEFINE_LOG_CATEGORY(LogRedUELegacy);
 
 URedUELegacySubsystem::URedUELegacySubsystem()
 {
     SingularityTextureFileCache = CreateDefaultSubobject<USingularityTextureFileCache>("SingularityTextureFileCache");
     OutContentPath = TEXT("/Game");
+}
+
+void URedUELegacySubsystem::ObjectPreload(ULegacyObject* InObject)
+{
+    if ( ObjectsLoaded.Contains(InObject))
+    {
+        if (InObject->LegacyObjectFlags & RLF_NeedLoad)
+        {
+            InObject->LegacyObjectFlags &= ~RLF_NeedLoad;
+            ULegacyPackage *Package = InObject->LegacyPackage;
+            const INT SavedPos = Package->Tell();
+            Package->PushStopper();
+            Package->SetupReader(InObject->LegacyPackageIndex);
+            UE_LOG(LogRedUELegacy,Log,TEXT("Pre loading %s %s from package %s\n"), *InObject->GetClass()->GetName(), *InObject->GetLegacyFullName(), *Package->FileName);
+            InObject->LegacySerialize(*Package);
+            if (Package->GetStopper() != Package->Tell())
+            {
+                UE_LOG(LogRedUELegacy,Warning,TEXT("%s::LegacySerialize(%s): %lld unread bytes"),*InObject->GetClass()->GetName(), *InObject->GetLegacyFullName(), Package->GetStopper() - Package->Tell());
+            }
+            Package->Seek(SavedPos);
+            Package->PopStopper();
+        }
+    }
 }
 
 void URedUELegacySubsystem::ObjectsBeginLoad()
@@ -24,6 +49,7 @@ void URedUELegacySubsystem::ObjectsBeginLoad()
 
 void URedUELegacySubsystem::ObjectsEndLoad()
 {
+    
     check(ObjectsBeginLoadCount > 0);
     if (ObjectsBeginLoadCount > 1)
     {
@@ -35,15 +61,20 @@ void URedUELegacySubsystem::ObjectsEndLoad()
     {
         ULegacyObject *InObject = ObjectsLoaded[0];
         ObjectsLoaded.RemoveAt(0);
-		ULegacyPackage *Package = InObject->LegacyPackage;
-        Package->SetupReader(InObject->LegacyPackageIndex);
-        UE_LOG(LogRedUELegacy,Log,TEXT("Loading %s %s from package %s\n"), *InObject->GetClass()->GetName(), *InObject->GetName(), *Package->FileName);
-        InObject->LegacySerialize(*Package);
-        if (Package->GetStopper() != Package->Tell())
+        if (InObject->LegacyObjectFlags &RLF_NeedLoad)
         {
-            UE_LOG(LogRedUELegacy,Warning,TEXT("%s::LegacySerialize(%s): %lld unread bytes"),*InObject->GetClass()->GetName(), *InObject->GetName(), Package->GetStopper() - Package->Tell());
+            InObject->LegacyObjectFlags &= ~RLF_NeedLoad;
+            ULegacyPackage *Package = InObject->LegacyPackage;
+            Package->SetupReader(InObject->LegacyPackageIndex);
+            UE_LOG(LogRedUELegacy,Log,TEXT("Loading %s %s from package %s\n"), *InObject->GetClass()->GetName(), *InObject->GetLegacyFullName(), *Package->FileName);
+            InObject->LegacySerialize(*Package);
+            if (Package->GetStopper() != Package->Tell())
+            {
+                UE_LOG(LogRedUELegacy,Warning,TEXT("%s::LegacySerialize(%s): %lld unread bytes"),*InObject->GetClass()->GetName(), *InObject->GetLegacyFullName(), Package->GetStopper() - Package->Tell());
+            }
+            LoadedObjects.Add(InObject);
         }
-        LoadedObjects.Add(InObject);
+		
     }
     
     for (ULegacyObject*LoadedObject:LoadedObjects)
@@ -61,6 +92,8 @@ void URedUELegacySubsystem::RefreshClasses(ERedUELegacyEngineType InCurrentEngin
     CurrentGameType = InCurrentGameType;
 
     Classes.Empty();
+    SequenceActionClasses.Empty();
+    
     for(TObjectIterator<UClass> It; It; ++It)
     {
         if( It->IsChildOf(ULegacyObject::StaticClass()))
@@ -71,6 +104,19 @@ void URedUELegacySubsystem::RefreshClasses(ERedUELegacyEngineType InCurrentEngin
                 Classes.Add(Factory->GetLegacyClassName(CurrentEngineType,CurrentGameType),*It);
             }
         }
+        if (CurrentEngineType  == ERedUELegacyEngineType::UnrealEngine3)
+        {
+            if( It->IsChildOf(USequenceAction::StaticClass()))
+            {
+                FString ClassName = It->GetName();
+                if(ClassName.StartsWith(TEXT("Legacy")))
+                {
+                    ClassName.RemoveAt(0,6);
+                }
+                SequenceActionClasses.Add(*ClassName,*It);
+            }
+        }
+     
     }
 }
 
@@ -90,6 +136,7 @@ void URedUELegacySubsystem::Initialize(ERedUELegacyEngineType InCurrentEngineTyp
     if(CurrentGameType == ERedUELegacyGameType::Bioshock3)
     {
         GetPackage(TEXT("Master_P"));
+        GetPackage(TEXT("XEntry_p"));
         GetPackage(TEXT("DLCB_Master_P"));
         GetPackage(TEXT("dlcb_CoalescedItems"));
     }
@@ -102,17 +149,24 @@ ULegacyObject* URedUELegacySubsystem::CreateObject(FName ObjectName, FName Class
     ensure(CurrentEngineType == FromPackage->EngineType);
     
     const TSubclassOf<ULegacyObject>* Class = Classes.Find(ClassName);
+    if (!Class && SequenceActionClasses.Contains(ClassName))
+    {
+        ULegacySequenceImporter* SequenceImporter = NewObject<ULegacySequenceImporter>(FromPackage,ULegacySequenceImporter::StaticClass(),ObjectName);
+        SequenceImporter->ToAction = NewObject<USequenceAction>(SequenceImporter,SequenceActionClasses[ClassName],ObjectName,RF_NoFlags);
+        return SequenceImporter;
+    }
     if(!Class)
     {
         return nullptr;
     }
-    return NewObject<ULegacyObject>(FromPackage,Class->Get(),ObjectName);
+    ULegacyObject*Result = NewObject<ULegacyObject>(FromPackage,Class->Get(),ObjectName);
+    return Result;
 }
 
 bool URedUELegacySubsystem::IsKnownClass(FName ClassName)
 {
     const TSubclassOf<ULegacyObject>* Class = Classes.Find(ClassName);
-    return Class != nullptr;
+    return Class != nullptr || SequenceActionClasses.Contains(ClassName);
 }
 
 ULegacyPackage* URedUELegacySubsystem::GetPackage(const FString& FileName)
@@ -154,10 +208,12 @@ void URedUELegacySubsystem::Clear()
     Packages.Empty();
     ObjectsLoaded.Empty();
     Classes.Empty();
+    SequenceActionClasses.Empty();
     CacheNoFoundClasses.Empty();
     Skeletons.Empty();
     CurrentEngineType = ERedUELegacyEngineType::Unkown;
     CurrentGameType = ERedUELegacyGameType::Unkown;
+    CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
 }
 
 void URedUELegacySubsystem::ToCacheSkeletons()

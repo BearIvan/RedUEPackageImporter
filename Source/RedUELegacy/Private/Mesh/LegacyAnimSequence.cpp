@@ -325,11 +325,39 @@ struct FLegacyVectorFixed48
 	}
 };
 
+void ULegacyAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnimSet* OwnerAnimSet, IAnimationDataController& Controller, const bool bShouldTransact)
+{
+	for (int32 BoneIndex = 0; BoneIndex < RawAnimData.Num(); ++BoneIndex)
+	{
+		FName BoneName = OwnerAnimSet->TrackBoneNames[BoneIndex];
+		TArray<FVector> PosKeys;
+		TArray<FQuat> RotKeys;
+		TArray<FVector> ScaleKeys;
+		for (int32 FrameIndex = 0; FrameIndex < NumFrames; ++FrameIndex)
+		{
+			FVector3f PosKey;
+			FQuat4f RotKey;
+			FVector3f ScaleKey = {1, 1, 1};
+			RawAnimData[BoneIndex].GetBonePosition(FrameIndex, NumFrames, PosKey, RotKey);
+			PosKeys.Add(FVector(PosKey.X, PosKey.Y, PosKey.Z));
+			RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, -RotKey.W));
+			ScaleKeys.Add(FVector(ScaleKey.X, ScaleKey.Y, ScaleKey.Z));
+		}
+
+		Controller.AddBoneTrack(BoneName, bShouldTransact);
+		Controller.SetBoneTrackKeys(BoneName, PosKeys, RotKeys, ScaleKeys, bShouldTransact);
+	}
+}
+
 UAnimSequence* ULegacyAnimSequence::CreateSequence(ULegacyAnimSet* OwnerAnimSet, USkeleton* Skeleton)
 {
 	if (PresentObject)
 	{
 		return CastChecked<UAnimSequence>(PresentObject);
+	}
+	if (!CanImport())
+	{
+		return nullptr;
 	}
 	FString PathToSkeleton = Skeleton->GetPathName();
 	PathToSkeleton = FPaths::GetPath(PathToSkeleton) / FPaths::GetCleanFilename(PathToSkeleton) + TEXT("_Anims") / SequenceName.ToString();
@@ -355,7 +383,7 @@ UAnimSequence* ULegacyAnimSequence::CreateSequence(ULegacyAnimSet* OwnerAnimSet,
 			// If we should transact, we'll already have a transaction from somewhere else. We should suppress this because
 			// it will also create a transaction when importing into UE assets, and the level sequence assets can emit some warnings about it
 			const bool bShouldTransact = false;
-			Controller.OpenBracket(NSLOCTEXT("RedUELegacy","UEPackegeImporterAnimData_Bracket", "UEPackegeImporter Animation Data"), bShouldTransact);
+			Controller.OpenBracket(NSLOCTEXT("RedUELegacy", "UEPackegeImporterAnimData_Bracket", "UEPackegeImporter Animation Data"), bShouldTransact);
 			Controller.ResetModel(bShouldTransact);
 
 			Controller.InitializeModel();
@@ -366,29 +394,11 @@ UAnimSequence* ULegacyAnimSequence::CreateSequence(ULegacyAnimSet* OwnerAnimSet,
 			// transformation with the rest pose. Another benefit is that that doing it this way lets us offload the interpolation to USD, so that it can do it
 			// however it likes, and we can just sample the joints at the target framerate
 
-			for (int32 BoneIndex = 0; BoneIndex < RawAnimData.Num(); ++BoneIndex)
-			{
-				FName BoneName = OwnerAnimSet->TrackBoneNames[BoneIndex];
-				TArray<FVector> PosKeys;
-				TArray<FQuat> RotKeys;
-				TArray<FVector> ScaleKeys;
-				for (int32 FrameIndex = 0; FrameIndex < NumFrames; ++FrameIndex)
-				{
-					FVector3f PosKey;
-					FQuat4f RotKey;
-					FVector3f ScaleKey = {1,1,1};
-					RawAnimData[BoneIndex].GetBonePosition(FrameIndex,NumFrames,PosKey,RotKey);
-					PosKeys.Add(FVector(PosKey.X, PosKey.Y, PosKey.Z));
-					RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, -RotKey.W));
-					ScaleKeys.Add(FVector(ScaleKey.X, ScaleKey.Y, ScaleKey.Z));
-				}
-
-				Controller.AddBoneTrack(BoneName, bShouldTransact);
-				Controller.SetBoneTrackKeys(BoneName, PosKeys, RotKeys, ScaleKeys, bShouldTransact);
-			}
+			
+			BuildAnimation(Skeleton,OwnerAnimSet, Controller, bShouldTransact);
 
 			AnimSequence->Interpolation = EAnimInterpolationType::Linear;
-			float NumRate = NumFrames/SequenceLength;
+			float NumRate = NumFrames / SequenceLength;
 			AnimSequence->ImportFileFramerate = NumRate;
 			AnimSequence->ImportResampleFramerate = NumRate;
 			AnimSequence->RateScale = RateScale;
@@ -686,14 +696,13 @@ void ULegacyAnimSequence::FillRawAnimData(ULegacyAnimSet* OwnerAnimSet)
 		// read translation keys
 		if (TransKeys)
 		{
-			
 			AnimationCompressionFormat LocalTranslationCompressionFormat = TranslationCompressionFormat;
 			Reader.Seek(TransOffset);
 			if (TransKeys == 1)
 			{
 				LocalTranslationCompressionFormat = ACF_None; // single key is stored without compression
 			}
-			
+
 			// read mins/ranges
 			if (LocalTranslationCompressionFormat == ACF_IntervalFixed32NoW)
 			{
@@ -817,4 +826,696 @@ void ULegacyAnimSequence::FillRawAnimData(ULegacyAnimSet* OwnerAnimSet)
 		Reader.Seek(Align(Reader.Tell(), 4));
 		if (HasTimeTracks) ReadTimeArray(Reader, RotKeys, A->KeyQuatTime, NumFrames);
 	}
+}
+
+bool ULegacyAnimSequence::CanImport()
+{
+	return true;
+}
+
+void FLegacyMorphemeAnimChannelSetInfoQSA::Unpack()
+{
+	FLegacyMorphemeAnimChannelSetInfoQSA* AnimChannelSetInfo = this;
+	uint8* AnimChannelSetInfoData = reinterpret_cast<uint8*>(AnimChannelSetInfo) + sizeof(FLegacyMorphemeAnimChannelSetInfoQSA);
+
+	auto UnpackData = [&AnimChannelSetInfoData]<typename T>(T*& Ptr, int32 Count)
+	{
+		Ptr = reinterpret_cast<T*>(AnimChannelSetInfoData);
+		AnimChannelSetInfoData += sizeof(T) * Count;
+		AnimChannelSetInfoData = Align(AnimChannelSetInfoData, 4);
+	};
+
+	UnchangingPosData = nullptr;
+	if ( UnchangingPosNumChannels )
+	{
+		UnpackData(UnchangingPosData,UnchangingPosNumChannels);
+	}
+	
+	UnchangingQuatData = nullptr;
+	if ( UnchangingQuatNumChannels )
+	{
+		UnpackData(UnchangingQuatData,UnchangingQuatNumChannels);
+	}
+
+	ChannelPositionInfo = nullptr;
+	ChannelQuatInfo = nullptr;
+	if ( CountChannelSets )
+	{
+		UnpackData(ChannelPositionInfo,CountChannelSets);
+		UnpackData(ChannelQuatInfo,CountChannelSets);
+	}
+}
+
+void FLegacyMorphemeAnimSectionQSA::Unpack()
+{
+	FLegacyMorphemeAnimSectionQSA* AnimSection = this;
+	uint8* AnimSectionData = reinterpret_cast<uint8*>(AnimSection) + sizeof(FLegacyMorphemeAnimSectionQSA);
+	AnimSectionData = Align(AnimSectionData, 4);
+
+	auto UnpackData = [&AnimSectionData]<typename T>(T*& Ptr, int32 Count)
+	{
+		Ptr = reinterpret_cast<T*>(AnimSectionData);
+		AnimSectionData += sizeof(T) * Count;
+		AnimSectionData = Align(AnimSectionData, 4);
+	};
+
+	if (AnimSection->SampledPosNumChannels)
+	{
+		ensure(AnimSection->SampledPosNumQuantisationSets > 0);
+		UnpackData(AnimSection->SampledPosQuantisationInfo, AnimSection->SampledPosNumQuantisationSets);
+		UnpackData(AnimSection->SampledPosQuantisationData, AnimSection->SampledPosNumChannels);
+		UnpackData(AnimSection->SampledPosData, AnimSection->SectionNumAnimFrames * AnimSection->SampledPosByteStride);
+	}
+	else
+	{
+		AnimSection->SampledPosQuantisationInfo = nullptr;
+		AnimSection->SampledPosQuantisationData = nullptr;
+		AnimSection->SampledPosData = nullptr;
+	}
+
+	if (AnimSection->SampledQuatNumChannels)
+	{
+		ensure(AnimSection->SampledQuatNumQuantisationSets > 0);
+		UnpackData(AnimSection->SampledQuatQuantisationInfo, AnimSection->SampledQuatNumQuantisationSets);
+		UnpackData(AnimSection->SampledQuatQuantisationData, AnimSection->SampledQuatNumChannels);
+		UnpackData(AnimSection->SampledQuatData, AnimSection->SectionNumAnimFrames * AnimSection->SampledQuatByteStride);
+	}
+	else
+	{
+		AnimSection->SampledQuatQuantisationInfo = nullptr;
+		AnimSection->SampledQuatQuantisationData = nullptr;
+		AnimSection->SampledQuatData = nullptr;
+	}
+
+	if (AnimSection->SplineNumKnots)
+	{
+		ensure(AnimSection->SplineNumKnots >= 2u);
+
+		UnpackData(AnimSection->SplineKnots, AnimSection->SplineNumKnots);
+	}
+	else
+	{
+		AnimSection->SplineKnots = nullptr;
+	}
+	if (AnimSection->SplinePosNumChannels)
+	{
+		ensure(AnimSection->SplinePosNumQuantisationSets);
+		UnpackData(AnimSection->SplinePosQuantisationInfo, AnimSection->SplinePosNumQuantisationSets);
+		UnpackData(AnimSection->SplinePosQuantisationData, AnimSection->SplinePosNumChannels);
+		UnpackData(AnimSection->SplinePosData, (3 * AnimSection->SplineNumKnots - 2) * AnimSection->SplinePosByteStride);
+	}
+	else
+	{
+		AnimSection->SplinePosQuantisationInfo = nullptr;
+		AnimSection->SplinePosQuantisationData = nullptr;
+		AnimSection->SplinePosData = nullptr;
+	}
+	if (AnimSection->SplineQuatNumChannels)
+	{
+		ensure(AnimSection->SplineQuatKeysNumQuantisationSets);
+		UnpackData(AnimSection->SplineQuatKeysQuantisationInfo, AnimSection->SplineQuatKeysNumQuantisationSets);
+		UnpackData(AnimSection->SplineQuatKeysQuantisationData, AnimSection->SplineQuatNumChannels);
+		UnpackData(AnimSection->SplineQuatWNegsData, AnimSection->SplineNumKnots * AnimSection->SplineQuatWNegsByteStride);
+		UnpackData(AnimSection->SplineQuatKeysData, AnimSection->SplineNumKnots * AnimSection->SplineQuatKeysByteStride);
+
+
+		ensure(AnimSection->SplineQuatTangentsNumQuantisationSets);
+		UnpackData(AnimSection->SplineQuatTangentsQuantisationInfo, AnimSection->SplineQuatTangentsNumQuantisationSets);
+		UnpackData(AnimSection->SplineQuatTangentsQuantisationData, AnimSection->SplineQuatNumChannels);
+		UnpackData(AnimSection->SplineQuatTangentsData, (AnimSection->SplineNumKnots - 1) * 2 * AnimSection->SplineQuatTangentsByteStride);
+	}
+	else
+	{
+		AnimSection->SplineQuatKeysQuantisationInfo = nullptr;
+		AnimSection->SplineQuatKeysQuantisationData = nullptr;
+		AnimSection->SplineQuatWNegsData = nullptr;
+		AnimSection->SplineQuatKeysData = nullptr;
+		AnimSection->SplineQuatTangentsQuantisationInfo = nullptr;
+		AnimSection->SplineQuatTangentsQuantisationData = nullptr;
+		AnimSection->SplineQuatTangentsData = nullptr;
+	}
+	ensure(reinterpret_cast<uint8*>(AnimSection) + AnimSection->SectionSize >  AnimSectionData);
+}
+
+void FLegacyMorphemeAnimSourceTypeQSA::Unpack(const TArray<FLegacyMorphemeAnimSectionData>& SectionData, int32 AnimDataSize)
+{
+	ChannelSetsInfo = reinterpret_cast<FLegacyMorphemeAnimChannelSetInfoQSA*>(reinterpret_cast<uint8*>(ChannelSetsInfo) + reinterpret_cast<int64>(this));
+	ChannelSetsInfo->Unpack();
+	Sections = reinterpret_cast<FLegacyMorphemeAnimSectionQSA**>(reinterpret_cast<uint8*>(Sections) + reinterpret_cast<int64>(this));
+	for (int32 i = 0; i < NumSections; i++)
+	{
+		check(reinterpret_cast<int64>(Sections[i]) == AnimDataSize);
+		Sections[i] = (FLegacyMorphemeAnimSectionQSA*)SectionData[i].Data.GetData();
+		AnimDataSize += SectionData[i].Data.Num();
+		Sections[i]->Unpack();
+	}
+	SectionsInfo = reinterpret_cast<FLegacyMorphemeAnimSectionInfoQSA*>(reinterpret_cast<uint8*>(SectionsInfo) + reinterpret_cast<int64>(this));
+}
+
+void FLegacyMorphemeAnimChannelSetInfoNSA::Unpack()
+{
+	FLegacyMorphemeAnimChannelSetInfoNSA* AnimChannelSetInfo = this;
+	uint8* AnimChannelSetInfoData = reinterpret_cast<uint8*>(AnimChannelSetInfo) + sizeof(FLegacyMorphemeAnimChannelSetInfoNSA);
+
+	auto UnpackData = [&AnimChannelSetInfoData]<typename T>(T*& Ptr, int32 Count)
+	{
+		Ptr = reinterpret_cast<T*>(AnimChannelSetInfoData);
+		AnimChannelSetInfoData += sizeof(T) * Count;
+		AnimChannelSetInfoData = Align(AnimChannelSetInfoData, 4);
+	};
+
+	UnchangingPosData = nullptr;
+	if ( UnchangingPosNumChannels )
+	{
+		UnpackData(UnchangingPosData,UnchangingPosNumChannels);
+	}
+	
+	UnchangingQuatData = nullptr;
+	if ( UnchangingQuatNumChannels )
+	{
+		UnpackData(UnchangingQuatData,UnchangingQuatNumChannels);
+	}
+
+	ChannelPosInfo = nullptr;
+	ChannelQuatInfo = nullptr;
+	if ( NumChannelSets )
+	{
+		UnpackData(ChannelPosInfo,NumChannelSets);
+		UnpackData(ChannelQuatInfo,NumChannelSets);
+	}
+}
+
+void FLegacyMorphemeAnimSubSectionNSA::Unpack()
+{
+	FLegacyMorphemeAnimSubSectionNSA* AnimSection = this;
+	check(IsAligned(AnimSection,0x10));
+	uint8* AnimSectionData = reinterpret_cast<uint8*>(AnimSection) + sizeof(FLegacyMorphemeAnimSubSectionNSA);
+	AnimSectionData = Align(AnimSectionData, 4);
+
+	auto UnpackData = [&AnimSectionData]<typename T>(T*& Ptr, int32 Count)
+	{
+		Ptr = reinterpret_cast<T*>(AnimSectionData);
+		AnimSectionData += sizeof(T) * Count;
+		AnimSectionData = Align(AnimSectionData, 4);
+	};
+
+	if (AnimSection->SampledPosNumChannels)
+	{
+		ensure(AnimSection->SampledPosNumQuantisationSets > 0);
+		UnpackData(AnimSection->SampledPosQuantisationInfo, AnimSection->SampledPosNumQuantisationSets);
+		UnpackData(AnimSection->SampledPosQuantisationData, AnimSection->SampledPosNumChannels);
+		UnpackData(AnimSection->SampledPosData, AnimSection->SectionNumAnimFrames * AnimSection->SampledPosNumChannels);
+	}
+	else
+	{
+		AnimSection->SampledPosQuantisationInfo = nullptr;
+		AnimSection->SampledPosQuantisationData = nullptr;
+		AnimSection->SampledPosData = nullptr;
+	}
+
+	AnimSectionData = Align(AnimSectionData, 0x10);
+	
+	if (AnimSection->SampledQuatNumChannels)
+	{
+		ensure(AnimSection->SampledQuatNumQuantisationSets > 0);
+		UnpackData(AnimSection->SampledQuatQuantisationInfo, AnimSection->SampledQuatNumQuantisationSets);
+		UnpackData(AnimSection->SampledQuatQuantisationData, AnimSection->SampledQuatNumChannels);
+		UnpackData(AnimSection->SampledQuatData, AnimSection->SectionNumAnimFrames * AnimSection->SampledQuatNumChannels);
+	}
+	else
+	{
+		AnimSection->SampledQuatQuantisationInfo = nullptr;
+		AnimSection->SampledQuatQuantisationData = nullptr;
+		AnimSection->SampledQuatData = nullptr;
+	}
+}
+
+void FLegacyMorphemeAnimSectionNSA::Unpack()
+{
+	uint8* Pointer = reinterpret_cast<uint8*>(this) + sizeof(FLegacyMorphemeAnimSectionNSA);
+	
+	auto UnpackData = [&Pointer]<typename T>(T*& Ptr, int32 Count)
+	{
+		Ptr = reinterpret_cast<T*>(Pointer);
+		Pointer += sizeof(T) * Count;
+		Pointer = Align(Pointer, 4);
+	};
+	UnpackData(Subsections,NumSubSections);
+	for (int32 i = 0; i < NumSubSections; i++)
+	{
+		Pointer = Align(Pointer, 0x10);
+		Subsections[i] = reinterpret_cast<FLegacyMorphemeAnimSubSectionNSA*>(Pointer);
+		Pointer += Subsections[i]->SubsectionSize;
+		Subsections[i]->Unpack();
+	}
+}
+
+void FLegacyMorphemeAnimSourceTypeNSA::Unpack(const TArray<FLegacyMorphemeAnimSectionData>& SectionData, int32 AnimDataSize)
+{
+	ChannelSetsInfo = reinterpret_cast<FLegacyMorphemeAnimChannelSetInfoNSA*>(reinterpret_cast<uint8*>(ChannelSetsInfo) + reinterpret_cast<int64>(this));
+	ChannelSetsInfo->Unpack();
+	Sections = reinterpret_cast<FLegacyMorphemeAnimSectionNSA**>(reinterpret_cast<uint8*>(Sections) + reinterpret_cast<int64>(this));
+	for (int32 i = 0; i < NumSections; i++)
+	{
+		check(reinterpret_cast<int64>(Sections[i]) == AnimDataSize);
+		Sections[i] = (FLegacyMorphemeAnimSectionNSA*)SectionData[i].Data.GetData();
+		AnimDataSize += SectionData[i].Data.Num();
+		Sections[i]->Unpack();
+	}
+	SectionsInfo = reinterpret_cast<FLegactMorphemeAnimSectionInfoNSA*>(reinterpret_cast<uint8*>(SectionsInfo) + reinterpret_cast<int64>(this));
+}
+
+
+
+void FLegacyMorphemeHierarchy::Unpack()
+{
+	HierarchyArray = reinterpret_cast<int32*>(reinterpret_cast<uint8*>(this) + sizeof(FLegacyMorphemeHierarchy));      
+}
+
+void FLegacyMorphemeAnimRigDef::Unpack()
+{
+	Hierarchy = reinterpret_cast<FLegacyMorphemeHierarchy*>(reinterpret_cast<uint8*>(Hierarchy) + reinterpret_cast<int64>(this));
+	Hierarchy->Unpack();
+}
+
+void ULegacyMorphemeAnimSequence::FillRawAnimData(ULegacyAnimSet* OwnerAnimSet)
+{
+}
+
+void ULegacyMorphemeAnimSequence::LegacySerialize(FRedUELegacyArchive& Ar)
+{
+	Super::LegacySerialize(Ar);
+	{
+		AnimSourceData.Serialize(Ar);
+		CompiledAnimDataPC32.Serialize(Ar);
+		CompiledAnimDataPC64.Serialize(Ar);
+		CompiledAnimDataX360.Serialize(Ar);
+		CompiledAnimDataPS3.Serialize(Ar);
+
+		Ar << CompiledAnimSectionDataPC32;
+		Ar << CompiledAnimSectionDataPC64;
+		Ar << CompiledAnimSectionDataX360;
+		Ar << CompiledAnimSectionDataPS3;
+	}
+	Ar.Seek(Ar.GetStopper());
+}
+
+void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnimSet* OwnerAnimSet, IAnimationDataController& Controller, bool bShouldTransact)
+{
+	ULegacyMorphemeAnimSet* MorphemeAnimSet = CastChecked<ULegacyMorphemeAnimSet>(GetOuter());
+
+	auto VectorToQuat = [](const FVector3f& InVector)
+	{
+		FVector3f TempVector = InVector;
+		float mag2 = InVector.SquaredLength();
+		float opm2 = 1 + mag2;
+		float fac = 2 / opm2;
+		TempVector *= fac;
+		FQuat4f OutQuat;
+		OutQuat.W = (1 - mag2) / opm2;
+		OutQuat.X = TempVector.X;
+		OutQuat.Y = TempVector.Y;
+		OutQuat.Z = TempVector.Z;
+		return OutQuat;
+	};
+
+	if (AnimationFormat == 2)
+	{
+		FLegacyMorphemeAnimSourceTypeNSA* AnimSourceDataTypeNSA = reinterpret_cast<FLegacyMorphemeAnimSourceTypeNSA*>(CompiledAnimDataPC64.BulkData);
+		AnimSourceDataTypeNSA->Unpack(CompiledAnimSectionDataPC64, CompiledAnimDataPC64.ElementCount);
+		FLegacyMorphemeAnimRigToAnimMap* RigToAnimMap = reinterpret_cast<FLegacyMorphemeAnimRigToAnimMap*>(MorphemeAnimSet->CompiledRigToAnimMapDataPC64.BulkData+48);
+		RigToAnimMap->Unpack();
+
+		FLegacyMorphemeAnimRigDef* RigDef = reinterpret_cast<FLegacyMorphemeAnimRigDef*>(MorphemeAnimSet->CompiledRigDataPC64.BulkData+48);
+		RigDef->Unpack();
+		FLegacyMorphemeAnimChannelSetInfoNSA* ChannelSetsInfo = AnimSourceDataTypeNSA->ChannelSetsInfo;
+
+		
+		TArray<TArray<FVector3f>>  KeyPositions;
+		TArray<TArray<FQuat4f>>  KeyRotations;
+
+		
+		KeyPositions.AddZeroed(RigToAnimMap->m_numRigBones);
+		KeyRotations.AddZeroed(RigToAnimMap->m_numRigBones);
+		for (int32 SectionID = 0; SectionID < AnimSourceDataTypeNSA->NumSections; SectionID++)
+		{
+			FLegacyMorphemeAnimSectionNSA* Section = AnimSourceDataTypeNSA->Sections[SectionID];
+			for (int32 SubSectionID = 0; SubSectionID < Section->NumSubSections; SubSectionID++)
+			{
+				FLegacyMorphemeAnimSubSectionNSA* SubSection = Section->Subsections[SubSectionID];
+				for (int32 Key = 0;Key < SubSection->SectionNumAnimFrames; Key++)
+				{
+					for (int32  i = 0 ;i< ChannelSetsInfo->UnchangingPosNumChannels ;i++)
+					{
+						int32 PosID = ChannelSetsInfo->ChannelPosInfo[i];
+						FVector3f&KeyPosition = KeyPositions[RigToAnimMap->m_rigIndices[PosID]].AddDefaulted_GetRef();
+						KeyPosition.X = ChannelSetsInfo->UnchangingPosData[i].X;
+						KeyPosition.Y = ChannelSetsInfo->UnchangingPosData[i].Y;
+						KeyPosition.Z = ChannelSetsInfo->UnchangingPosData[i].Z;
+						KeyPosition *= ChannelSetsInfo->UnchangingPosQuantisationInfo.Scale;
+						KeyPosition += ChannelSetsInfo->UnchangingPosQuantisationInfo.Min;
+					}
+
+					for (int32  i = 0 ;i< ChannelSetsInfo->UnchangingQuatNumChannels ;i++)
+					{
+						int32 PosID = ChannelSetsInfo->ChannelQuatInfo[i];
+						FVector3f KeyRotation;
+						KeyRotation.X = ChannelSetsInfo->UnchangingQuatData[i].X;
+						KeyRotation.Y = ChannelSetsInfo->UnchangingQuatData[i].Y;
+						KeyRotation.Z = ChannelSetsInfo->UnchangingQuatData[i].Z;
+						//KeyRotation *= 1.f/0xFFFF;
+						KeyRotation *= ChannelSetsInfo->UnchangingQuatQuantisationInfo.Scale;
+						KeyRotation += ChannelSetsInfo->UnchangingQuatQuantisationInfo.Min;
+				
+						KeyRotations[RigToAnimMap->m_rigIndices[PosID]].Add(VectorToQuat(KeyRotation));
+					}
+
+					for (int32  i = ChannelSetsInfo->UnchangingPosNumChannels ;i < ChannelSetsInfo->NumChannelSets ;i++)
+					{
+						int32 LocalID = i - ChannelSetsInfo->UnchangingPosNumChannels;
+						int32 PosID = ChannelSetsInfo->ChannelPosInfo[i];
+						FVector3f&KeyPosition = KeyPositions[RigToAnimMap->m_rigIndices[PosID]].AddDefaulted_GetRef();
+
+						const FLegacyMorphemeQuantisationDataNSA& QuantisationData = SubSection->SampledPosQuantisationData[LocalID];
+
+						FVector3f Mean = FVector3f((QuantisationData.Mean[0]),(QuantisationData.Mean[1]),(QuantisationData.Mean[2]));
+						FVector3f StartPosition = SubSection->PosMeansQuantisationInfo.Min + SubSection->PosMeansQuantisationInfo.Scale*Mean;
+						
+						KeyPosition.X = static_cast<float>((SubSection->SampledPosData[LocalID + Key*SubSection->SampledPosNumChannels].Data >> 21) & 0x7FF);  // 11 bits
+						KeyPosition.Y = static_cast<float>((SubSection->SampledPosData[LocalID + Key*SubSection->SampledPosNumChannels].Data >> 10) & 0x7FF);  // 11 bits
+						KeyPosition.Z = static_cast<float>(SubSection->SampledPosData[LocalID + Key*SubSection->SampledPosNumChannels].Data & 0x3FF);   // 10 bits
+
+						for (int32 a = 0; a < 3; a++)
+						{
+							KeyPosition[a] *= SubSection->SampledPosQuantisationInfo[QuantisationData.QuantisationSet[a]].Scale[a];
+							KeyPosition[a] += SubSection->SampledPosQuantisationInfo[QuantisationData.QuantisationSet[a]].Min[a];
+						}
+						KeyPosition += StartPosition;
+					}
+
+					for (int32  i = ChannelSetsInfo->UnchangingQuatNumChannels ;i < ChannelSetsInfo->NumChannelSets ;i++)
+					{
+						int32 LocalID = i - ChannelSetsInfo->UnchangingQuatNumChannels;
+						int32 PosID = ChannelSetsInfo->ChannelQuatInfo[i];
+						FVector3f KeyRotation;
+
+						const FLegacyMorphemeQuantisationDataNSA& QuantisationData = SubSection->SampledQuatQuantisationData[LocalID];
+
+						FVector3f Mean = FVector3f((QuantisationData.Mean[0]),(QuantisationData.Mean[1]),(QuantisationData.Mean[2]));
+						Mean *= 1.f/255.f;
+						FVector3f MinTQA = { -1.0f, -1.0f, -1.0f };
+						FVector3f MaxTQA = { 1.0f, 1.0f, 1.0f };
+						FVector3f StartPosition = MinTQA + (MaxTQA - MinTQA)*Mean;
+
+								
+						KeyRotation.X = SubSection->SampledQuatData[LocalID + Key*SubSection->SampledQuatNumChannels].X;
+						KeyRotation.Y = SubSection->SampledQuatData[LocalID + Key*SubSection->SampledQuatNumChannels].Y;
+						KeyRotation.Z = SubSection->SampledQuatData[LocalID + Key*SubSection->SampledQuatNumChannels].Z;
+											
+						for (int32 a = 0; a < 3; a++)
+						{
+							KeyRotation[a] *= SubSection->SampledQuatQuantisationInfo[QuantisationData.QuantisationSet[a]].Scale[a];
+							KeyRotation[a] += SubSection->SampledQuatQuantisationInfo[QuantisationData.QuantisationSet[a]].Min[a];
+						}
+						
+						FQuat4f ResultQuat = VectorToQuat(KeyRotation);
+						FQuat4f StartQuat = VectorToQuat(StartPosition);
+						KeyRotations[RigToAnimMap->m_rigIndices[PosID]].Add(StartQuat*ResultQuat);
+					}
+				}
+			}
+		}
+		NumFrames = 0;
+		SequenceLength = AnimSourceDataTypeNSA->Duration;
+		for (int32 RigIndex = 1; RigIndex <KeyPositions.Num(); RigIndex++)
+		{
+			check(KeyPositions[RigIndex].Num() == KeyRotations[RigIndex].Num())
+			if (KeyPositions[RigIndex].Num() == 0)
+			{
+				continue;
+			}
+			FName BoneName = OwnerAnimSet->TrackBoneNames[RigIndex-1];
+			TArray<FVector> PosKeys;
+			TArray<FQuat> RotKeys;
+			TArray<FVector> ScaleKeys;
+			for (int32 FrameIndex = 0; FrameIndex < KeyPositions[RigIndex].Num(); ++FrameIndex)
+			{
+				FVector3f PosKey = KeyPositions[RigIndex][FrameIndex]*50.f;
+				FQuat4f RotKey = KeyRotations[RigIndex][FrameIndex];
+				FVector3f ScaleKey = {1, 1, 1};
+				PosKeys.Add(FVector(PosKey.X, PosKey.Y, PosKey.Z));
+				RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, RotKey.W));
+				ScaleKeys.Add(FVector(ScaleKey.X, ScaleKey.Y, ScaleKey.Z));
+				
+			}
+			if (NumFrames == 0)
+			{
+				NumFrames = KeyPositions[RigIndex].Num();
+			}
+			else
+			{
+				ensure(NumFrames == KeyPositions[RigIndex].Num());
+			}
+
+			Controller.AddBoneCurve(BoneName, bShouldTransact);
+			Controller.SetBoneTrackKeys(BoneName, PosKeys, RotKeys, ScaleKeys, bShouldTransact);
+		}
+	}
+	else if (AnimationFormat == 3)
+	{
+		FLegacyMorphemeAnimSourceTypeQSA* AnimSourceDataTypeQSA = reinterpret_cast<FLegacyMorphemeAnimSourceTypeQSA*>(CompiledAnimDataPC64.BulkData);
+		AnimSourceDataTypeQSA->Unpack(CompiledAnimSectionDataPC64, CompiledAnimDataPC64.ElementCount);
+
+
+		FLegacyMorphemeAnimChannelSetInfoQSA* ChannelSetsInfo = AnimSourceDataTypeQSA->ChannelSetsInfo;
+		FLegacyMorphemeAnimRigToAnimMap* RigToAnimMap = reinterpret_cast<FLegacyMorphemeAnimRigToAnimMap*>(MorphemeAnimSet->CompiledRigToAnimMapDataPC64.BulkData+48);
+		RigToAnimMap->Unpack();
+
+		FLegacyMorphemeAnimRigDef* RigDef = reinterpret_cast<FLegacyMorphemeAnimRigDef*>(MorphemeAnimSet->CompiledRigDataPC64.BulkData+48);
+		RigDef->Unpack();
+		
+		if (!ensure(ChannelSetsInfo->SplinePositionNumChannels == 0))
+		{
+			return;
+		}
+		if (!ensure(ChannelSetsInfo->SplineQuatNumChannels == 0))
+		{
+			return;
+		}
+		
+		FLegacyMorphemeAnimSectionQSA* LastLegactMorphemeAnimSection = AnimSourceDataTypeQSA->Sections[AnimSourceDataTypeQSA->NumSections-1];
+		NumFrames = LastLegactMorphemeAnimSection->SectionAnimStartFrame + LastLegactMorphemeAnimSection->SectionNumAnimFrames;
+		SequenceLength = AnimSourceDataTypeQSA->Duration;
+		
+		TArray<TArray<FVector3f>>  KeyPositions;
+		TArray<TArray<FQuat4f>>  KeyRotations;
+	
+
+	
+		KeyPositions.AddZeroed(RigToAnimMap->m_numRigBones);
+		KeyRotations.AddZeroed(RigToAnimMap->m_numRigBones);
+		for (int32 Key = 0, SectionID = 0; Key < NumFrames; Key++)
+		{
+			TArray<bool> WorldSpace;
+			WorldSpace.AddZeroed(RigToAnimMap->m_numRigBones);
+			while (Key >= AnimSourceDataTypeQSA->Sections[SectionID]->SectionAnimStartFrame + AnimSourceDataTypeQSA->Sections[SectionID]->SectionNumAnimFrames)
+			{
+				SectionID++;
+			}
+
+			TArray<FIntVector3>				SampledPosKeys;
+			TArray<FIntVector3>				SampledQuatKeys;
+			FLegacyMorphemeAnimSectionQSA*	AnimSection		= AnimSourceDataTypeQSA->Sections[SectionID];
+			int32							LocalKey		= Key - AnimSection->SectionAnimStartFrame;
+			
+			FBitReader						CurrentPosData(&AnimSection->SampledPosData[LocalKey*AnimSection->SampledPosByteStride],AnimSection->SampledPosByteStride*8);
+			for ( int32 Channel = 0; Channel < AnimSection->SampledPosNumChannels; Channel++)
+			{
+				FIntVector3&SampleKey = SampledPosKeys.AddDefaulted_GetRef();
+				SampleKey = {0,0,0};
+				CurrentPosData.SerializeBits(&SampleKey.X,AnimSection->SampledPosQuantisationData[Channel].Prec[0]);
+				CurrentPosData.SerializeBits(&SampleKey.Y,AnimSection->SampledPosQuantisationData[Channel].Prec[1]);
+				CurrentPosData.SerializeBits(&SampleKey.Z,AnimSection->SampledPosQuantisationData[Channel].Prec[2]);
+			}
+			
+			FBitReader						CurrentQuatData(&AnimSection->SampledQuatData[LocalKey*AnimSection->SampledQuatByteStride],AnimSection->SampledQuatByteStride*8);
+			for ( int32 Channel = 0; Channel < AnimSection->SampledQuatNumChannels; Channel++)
+			{
+				FIntVector3&SampleKey = SampledQuatKeys.AddDefaulted_GetRef();
+				SampleKey = {0,0,0};
+				CurrentQuatData.SerializeBits(&SampleKey.X,AnimSection->SampledQuatQuantisationData[Channel].Prec[0]);
+				CurrentQuatData.SerializeBits(&SampleKey.Y,AnimSection->SampledQuatQuantisationData[Channel].Prec[1]);
+				CurrentQuatData.SerializeBits(&SampleKey.Z,AnimSection->SampledQuatQuantisationData[Channel].Prec[2]);
+			}
+			
+			for (int32  i = 0 ;i< ChannelSetsInfo->UnchangingPosNumChannels ;i++)
+			{
+				int32 PosID = ChannelSetsInfo->ChannelPositionInfo[i];
+				FVector3f&KeyPosition = KeyPositions[RigToAnimMap->m_rigIndices[PosID]].AddDefaulted_GetRef();
+				KeyPosition.X = ChannelSetsInfo->UnchangingPosData[i].X;
+				KeyPosition.Y = ChannelSetsInfo->UnchangingPosData[i].Y;
+				KeyPosition.Z = ChannelSetsInfo->UnchangingPosData[i].Z;
+				KeyPosition *= 1.f/0xFFFF;
+				KeyPosition *= ChannelSetsInfo->UnchangingPosQuantisationInfo.Max - ChannelSetsInfo->UnchangingPosQuantisationInfo.Min;
+				KeyPosition += ChannelSetsInfo->UnchangingPosQuantisationInfo.Min;
+			}
+
+			for (int32  i = 0 ;i< ChannelSetsInfo->UnchangingQuatNumChannels ;i++)
+			{
+				int32 PosID = ChannelSetsInfo->ChannelQuatInfo[i];
+				FVector3f KeyRotation;
+				KeyRotation.X = ChannelSetsInfo->UnchangingQuatData[i].X;
+				KeyRotation.Y = ChannelSetsInfo->UnchangingQuatData[i].Y;
+				KeyRotation.Z = ChannelSetsInfo->UnchangingQuatData[i].Z;
+				KeyRotation *= 1.f/0xFFFF;
+				KeyRotation *= ChannelSetsInfo->UnchangingQuatQuantisationInfo.Max - ChannelSetsInfo->UnchangingQuatQuantisationInfo.Min;
+				KeyRotation += ChannelSetsInfo->UnchangingQuatQuantisationInfo.Min;
+				
+				KeyRotations[RigToAnimMap->m_rigIndices[PosID]].Add(VectorToQuat(KeyRotation));
+			}
+			
+			for (int32  i = ChannelSetsInfo->UnchangingPosNumChannels ;i < ChannelSetsInfo->CountChannelSets ;i++)
+			{
+				int32 LocalID = i - ChannelSetsInfo->UnchangingPosNumChannels;
+				int32 PosID = ChannelSetsInfo->ChannelPositionInfo[i];
+				FVector3f&KeyPosition = KeyPositions[RigToAnimMap->m_rigIndices[PosID]].AddDefaulted_GetRef();
+
+				const FLegacyMorphemeQuantisationDataQSA& QuantisationData = AnimSection->SampledPosQuantisationData[LocalID];
+
+				FVector3f Mean = FVector3f((QuantisationData.Mean[0])*(1/255.f),(QuantisationData.Mean[1])*(1/255.f),(QuantisationData.Mean[2])*(1/255.f));
+				
+				FVector3f StartPosition = AnimSection->m_posMeansQuantisationInfo.Min + (AnimSection->m_posMeansQuantisationInfo.Max-AnimSection->m_posMeansQuantisationInfo.Min)*Mean;
+
+				
+				FVector3f Steps;
+				Steps[0] = 1.f/((0x80000001 << QuantisationData.Prec[0]) - 1);
+				Steps[1] = 1.f/((0x80000001 << QuantisationData.Prec[1]) - 1);
+				Steps[2] = 1.f/((0x80000001 << QuantisationData.Prec[2]) - 1);
+				
+				KeyPosition.X = SampledPosKeys[LocalID].X;
+				KeyPosition.Y = SampledPosKeys[LocalID].Y;
+				KeyPosition.Z = SampledPosKeys[LocalID].Z;
+				KeyPosition *= Steps;
+
+				for (int32 a = 0; a < 3; a++)
+				{
+					KeyPosition[a] *= AnimSection->SampledPosQuantisationInfo[QuantisationData.QuantisationSetID[a]].Max[a] - AnimSection->SampledPosQuantisationInfo[QuantisationData.QuantisationSetID[a]].Min[a];
+					KeyPosition[a] += AnimSection->SampledPosQuantisationInfo[QuantisationData.QuantisationSetID[a]].Min[a];
+				}
+				KeyPosition += StartPosition;
+			}
+			for (int32  i = ChannelSetsInfo->UnchangingQuatNumChannels ;i < ChannelSetsInfo->CountChannelSets ;i++)
+			{
+				int32 LocalID = i - ChannelSetsInfo->UnchangingQuatNumChannels;
+				int32 PosID = ChannelSetsInfo->ChannelQuatInfo[i];
+				FVector3f KeyRotation;
+
+				const FLegacyMorphemeQuantisationDataQSA& QuantisationData = AnimSection->SampledQuatQuantisationData[LocalID];
+
+				FVector3f Mean = FVector3f((QuantisationData.Mean[0])*(1/255.f),(QuantisationData.Mean[1])*(1/255.f),(QuantisationData.Mean[2])*(1/255.f));
+				FVector3f MinTQA = { -1.0f, -1.0f, -1.0f };
+				FVector3f MaxTQA = { 1.0f, 1.0f, 1.0f };
+				FVector3f StartPosition = MinTQA + (MaxTQA - MinTQA)*Mean;
+
+				
+				FVector3f Steps;
+				Steps[0] = 1.f/((0x80000001 << QuantisationData.Prec[0]) - 1);
+				Steps[1] = 1.f/((0x80000001 << QuantisationData.Prec[1]) - 1);
+				Steps[2] = 1.f/((0x80000001 << QuantisationData.Prec[2]) - 1);
+				
+				KeyRotation.X = SampledQuatKeys[LocalID].X;
+				KeyRotation.Y = SampledQuatKeys[LocalID].Y;
+				KeyRotation.Z = SampledQuatKeys[LocalID].Z;
+				KeyRotation *= Steps;
+
+				for (int32 a = 0; a < 3; a++)
+				{
+					KeyRotation[a] *= AnimSection->SampledQuatQuantisationInfo[QuantisationData.QuantisationSetID[a]].Max[a] - AnimSection->SampledQuatQuantisationInfo[QuantisationData.QuantisationSetID[a]].Min[a];
+					KeyRotation[a] += AnimSection->SampledQuatQuantisationInfo[QuantisationData.QuantisationSetID[a]].Min[a];
+				}
+				FQuat4f ResultQuat = VectorToQuat(KeyRotation);
+				FQuat4f StartQuat = VectorToQuat(StartPosition);
+				KeyRotations[RigToAnimMap->m_rigIndices[PosID]].Add(StartQuat*ResultQuat);
+				WorldSpace[RigToAnimMap->m_rigIndices[PosID]] = true;
+			}
+			uint16 RigRootIndex = RigToAnimMap->m_rigIndices[ChannelSetsInfo->WorldSpaceRootID ];
+			WorldSpace[RigRootIndex] = true;
+		
+			for (int32  RigIndex = RigToAnimMap->m_numRigBones -1 ;RigIndex >	RigRootIndex ;RigIndex--)
+			{
+				if (WorldSpace[RigIndex])
+				{
+					int32 RigParentIndex = RigDef->Hierarchy->HierarchyArray[RigIndex];
+					FQuat4f ParentQuat = KeyRotations[RigParentIndex].Last();
+					
+					while (!WorldSpace[RigParentIndex])
+					{
+						RigParentIndex =  RigDef->Hierarchy->HierarchyArray[RigParentIndex];
+						ParentQuat = KeyRotations[RigParentIndex].Last()*ParentQuat;
+					}
+
+					ParentQuat = ParentQuat.Inverse();
+					KeyRotations[RigIndex].Last() = ParentQuat*KeyRotations[RigIndex].Last();
+				}
+			}
+		}
+		
+		for (int32 RigIndex = 1; RigIndex <KeyPositions.Num(); RigIndex++)
+		{
+			check(KeyPositions[RigIndex].Num() == KeyRotations[RigIndex].Num())
+			if (KeyPositions[RigIndex].Num() == 0)
+			{
+				continue;
+			}
+
+			FName BoneName = OwnerAnimSet->TrackBoneNames[RigIndex-1];
+			TArray<FVector> PosKeys;
+			TArray<FQuat> RotKeys;
+			TArray<FVector> ScaleKeys;
+			for (int32 FrameIndex = 0; FrameIndex < NumFrames; ++FrameIndex)
+			{
+				FVector3f PosKey = KeyPositions[RigIndex][FrameIndex]*50.f;
+				FQuat4f RotKey = KeyRotations[RigIndex][FrameIndex];
+				FVector3f ScaleKey = {1, 1, 1};
+				PosKeys.Add(FVector(PosKey.X, PosKey.Y, PosKey.Z));
+				RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, RotKey.W));
+				ScaleKeys.Add(FVector(ScaleKey.X, ScaleKey.Y, ScaleKey.Z));
+				
+			}
+
+			Controller.AddBoneCurve(BoneName, bShouldTransact);
+			Controller.SetBoneTrackKeys(BoneName, PosKeys, RotKeys, ScaleKeys, bShouldTransact);
+		}
+	}
+	else
+	{
+		checkNoEntry();
+	}
+	
+}
+
+bool ULegacyMorphemeAnimSequence::CanImport()
+{
+	if (AnimationFormat == 3)
+	{
+		FLegacyMorphemeAnimSourceTypeQSA* AnimSourceDataTypeQSA = reinterpret_cast<FLegacyMorphemeAnimSourceTypeQSA*>(CompiledAnimDataPC64.BulkData);
+		FLegacyMorphemeAnimChannelSetInfoQSA* ChannelSetsInfo = reinterpret_cast<FLegacyMorphemeAnimChannelSetInfoQSA*>(reinterpret_cast<uint8*>(AnimSourceDataTypeQSA->ChannelSetsInfo) + reinterpret_cast<int64>(AnimSourceDataTypeQSA));
+			
+		if (!ensureMsgf(ChannelSetsInfo->SplinePositionNumChannels == 0 && ChannelSetsInfo->SplineQuatNumChannels == 0,TEXT("MorphemeAnimSequence[%s] QSA anim format not support spline"),*GetLegacyFullName(),AnimationFormat))
+		{
+			return false;
+		}
+		return true;
+	}
+	if (AnimationFormat == 2)
+	{
+		return true;
+	}
+	// TODO: Вроде не использовался в редакторе есть момент где он бьет по рукам за это версию
+	// if (AnimationFormat == 1)
+	// {
+	// 	return true;
+	// }
+	return ensureMsgf(false,TEXT("MorphemeAnimSequence[%s] not support format %d"),*GetLegacyFullName(),AnimationFormat);
+	
 }

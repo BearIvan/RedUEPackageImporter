@@ -2,6 +2,7 @@
 
 #include "Core/LegacyObject.h"
 #include "LegacySequenceObjects.generated.h"
+class UK2Node_SequenceAction;
 class UK2Node;
 
 USTRUCT(Blueprintable)
@@ -198,12 +199,8 @@ class REDUELEGACY_API ULegacySequenceOp : public ULegacySequenceObject
 {
 	GENERATED_BODY()
 public:
-	
-protected:
-	UPROPERTY(Transient)
-	UK2Node* CurrentNode = nullptr;
-	
-public:
+	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph);
+	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph);
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<FLegacySeqOpInputLink> InputLinks;
@@ -216,14 +213,30 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<FLegacySeqEventLink> EventLinks;
+	
+protected:
+	UPROPERTY(Transient)
+	UK2Node_SequenceAction* CurrentNode = nullptr;
 };
+
+UCLASS()
+class REDUELEGACY_API ULegacySequenceImporter : public ULegacySequenceOp
+{
+	GENERATED_BODY()
+public:
+	virtual UK2Node_SequenceAction* ExportToBlueprint				(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void					PreLegacySerializeUnrealProps	(FRedUELegacyArchive& Ar);
+	UPROPERTY(Transient)
+	class USequenceAction* ToAction = nullptr;
+};
+
+
 
 UCLASS()
 class REDUELEGACY_API ULegacySequenceAction : public ULegacySequenceOp
 {
 	GENERATED_BODY()
 public:
-	virtual UEdGraphPin* 	GetPinOrCreateNode	(UBlueprint* InBlueprint,UEdGraph* InGraph,int32 InputLinkIdx);
 	
 	UPROPERTY(BlueprintReadWrite)
 	FName HandlerName;
@@ -241,7 +254,6 @@ class REDUELEGACY_API ULegacySequenceEvent: public ULegacySequenceOp
 {
 	GENERATED_BODY()
 public:
-	virtual UK2Node*		ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph);
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<class ULegacySequenceEvent*> DuplicateEvts;
@@ -297,23 +309,6 @@ public:
 };
 
 UCLASS()
-class REDUELEGACY_API ULegacySeqEvent_LevelLoaded: public ULegacySequenceEvent
-{
-	GENERATED_BODY()
-public:
-	virtual UK2Node*	ExportToBlueprint(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
-};
-
-UCLASS()
-class REDUELEGACY_API ULegacySeqAct_SetMatInstScalarParam : public ULegacySequenceAction
-{
-	GENERATED_BODY()
-public:
-	
-	virtual UEdGraphPin* 	GetPinOrCreateNode	(UBlueprint* InBlueprint,UEdGraph* InGraph,int32 InputLinkIdx) override;
-};
-
-UCLASS()
 class REDUELEGACY_API ULegacySeqVar_Object : public ULegacySequenceVariable
 {
 	GENERATED_BODY()
@@ -330,8 +325,6 @@ class REDUELEGACY_API USeqAct_ToggleCinematicMode : public ULegacySequenceAction
 {
 	GENERATED_BODY()
 public:
-	
-	virtual UEdGraphPin* 	GetPinOrCreateNode	(UBlueprint* InBlueprint,UEdGraph* InGraph,int32 InputLinkIdx) override;
 	
 	UPROPERTY(BlueprintReadWrite)
 	bool bDisableMovement = true;
@@ -379,8 +372,8 @@ class REDUELEGACY_API ULegacySeqAct_Interp : public ULegacySequenceAction
 {
 	GENERATED_BODY()
 public:
-	
-	virtual UEdGraphPin* 	GetPinOrCreateNode	(UBlueprint* InBlueprint,UEdGraph* InGraph,int32 InputLinkIdx) override;
+	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph);
+	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph);
 };
 
 UCLASS()
@@ -388,6 +381,8 @@ class REDUELEGACY_API ULegacyInterpData : public ULegacySequenceVariable
 {
 	GENERATED_BODY()
 public:
+	UPROPERTY(BlueprintReadWrite)
+	float InterpLength;
 	
 	UPROPERTY(BlueprintReadWrite)
 	ULegacyObject* ObjValue;

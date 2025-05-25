@@ -20,6 +20,7 @@ class REDUELEGACY_API URedUELegacySubsystem : public UEditorSubsystem
 
 public:
                     URedUELegacySubsystem   ();
+    void            ObjectPreload			 (ULegacyObject* Object);
     void            ObjectsBeginLoad        ();
     void            ObjectsEndLoad          ();
     void            RefreshClasses          (ERedUELegacyEngineType CurrentEngineType, ERedUELegacyGameType CurrentGameType);
@@ -42,9 +43,13 @@ public:
     
     UPROPERTY(Transient)
     TArray<ULegacyObject*> ObjectsLoaded;
+	
 
     UPROPERTY(Transient)
     TMap<FName,TSubclassOf<ULegacyObject>> Classes;
+	
+	UPROPERTY(Transient)
+	TMap<FName,TSubclassOf<class USequenceAction>> SequenceActionClasses;
 
 	UPROPERTY(Transient)
 	class USingularityTextureFileCache* SingularityTextureFileCache = nullptr;

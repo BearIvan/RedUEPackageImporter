@@ -25,5 +25,7 @@ public class RedUELegacyGame : ModuleRules
                 "RenderCore",
             }
         );
+        
+        PublicIncludePaths.Add(ModuleDirectory);
     }
 }

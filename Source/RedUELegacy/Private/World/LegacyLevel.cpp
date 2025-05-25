@@ -3,6 +3,7 @@
 #include "Editor.h"
 #include "Core/RedUELegacyArchive.h"
 #include "Engine/LevelScriptBlueprint.h"
+#include "Kismet/Base/LegacyKismet.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Subsystems/AssetEditorSubsystem.h"
@@ -35,7 +36,12 @@ UObject* ULegacyLevel::ExportToContent()
     ULevelScriptBlueprint* LevelScriptBlueprint = GWorld->PersistentLevel->GetLevelScriptBlueprint(false);
     for(ULegacySequence* Sequence: GameSequences)
     {
-        Sequence->GenerateBlueprint(LevelScriptBlueprint);
+        if (UBlueprint* KismetBlueprint = CastChecked<UBlueprint>(Sequence->ExportToContent(),ECastCheckedType::NullAllowed))
+        {
+            ALegacyKismet*LevelKismet = GWorld->SpawnActor<ALegacyKismet>(KismetBlueprint->GeneratedClass);
+            Sequence->FillActor(LevelKismet);
+            
+        }
     }
     return nullptr;
 }

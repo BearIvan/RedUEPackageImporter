@@ -4,8 +4,6 @@
 #include "Core/RedUELegacyGame.h"
 #include "Material/LegacyMaterial3.h"
 #include "Material/LegacyTexture3.h"
-#include "Material/Expressions/RedSineRangeMaterialExpression.h"
-#include "Material/Expressions/RedSineRangeMaterialExpression.h"
 #include "Materials/MaterialExpressionAbs.h"
 #include "Materials/MaterialExpressionAdd.h"
 #include "Materials/MaterialExpressionAppendVector.h"
@@ -58,6 +56,7 @@
 #include "Materials/MaterialExpressionVertexColor.h"
 #include "Materials/MaterialExpressionWorldPosition.h"
 #include "Materials/MaterialFunction.h"
+#include "Materials/Expressions/RedSineRangeMaterialExpression.h"
 
 template <typename MaterialExpressionType>
 inline MaterialExpressionType* CreateExpressionTyped(UMaterial* Material, UClass* ClassExpression = nullptr)
