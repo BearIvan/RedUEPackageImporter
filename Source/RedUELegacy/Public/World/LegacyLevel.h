@@ -15,7 +15,7 @@ class REDUELEGACY_API ULegacyLevel : public ULegacyObject
 public:
     virtual void        LegacySerialize(FRedUELegacyArchive& Ar) override;
     virtual UObject*    ExportToContent() override;
-	
+	        void        ImportLevel     (bool ReimportKismet = false);
             FURL		URL;
     
     UPROPERTY()

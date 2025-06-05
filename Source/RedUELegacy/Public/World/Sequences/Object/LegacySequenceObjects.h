@@ -2,8 +2,12 @@
 
 #include "Core/LegacyObject.h"
 #include "LegacySequenceObjects.generated.h"
+class ALegacyKismet;
 class UK2Node_SequenceAction;
 class UK2Node;
+class ULevelSequence;
+class ISequencer;
+class ULegacyActor;
 
 USTRUCT(Blueprintable)
 struct FLegacySeqOpInputLink
@@ -71,6 +75,9 @@ struct FLegacySeqOpOutputLink
 	FString LinkDesc;
 	
 	UPROPERTY(BlueprintReadWrite)
+	FName XLinkName;
+	
+	UPROPERTY(BlueprintReadWrite)
 	bool bHasImpulse;
 	
 	UPROPERTY(BlueprintReadWrite)
@@ -117,6 +124,9 @@ struct FLegacySeqVarLink
 	
 	UPROPERTY(BlueprintReadWrite)
 	FString LinkDesc;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName XLinkName;
 	
 	UPROPERTY(BlueprintReadWrite)
 	FName LinkVar;
@@ -201,6 +211,7 @@ class REDUELEGACY_API ULegacySequenceOp : public ULegacySequenceObject
 public:
 	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph);
 	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph);
+	virtual void					SimulatedImport	();
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<FLegacySeqOpInputLink> InputLinks;
@@ -226,6 +237,7 @@ class REDUELEGACY_API ULegacySequenceImporter : public ULegacySequenceOp
 public:
 	virtual UK2Node_SequenceAction* ExportToBlueprint				(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	virtual void					PreLegacySerializeUnrealProps	(FRedUELegacyArchive& Ar);
+			void					FillPin							(UBlueprint* InBlueprint, UEdGraph* InGraph, const FLegacySeqOpOutputLink& LegacySeqOpOutputLink, UEdGraphPin* OutputPin);
 	UPROPERTY(Transient)
 	class USequenceAction* ToAction = nullptr;
 };
@@ -300,6 +312,7 @@ class ULegacySequenceVariable : public ULegacySequenceObject
 public:
 	virtual UK2Node*					CreateGetNode			(UBlueprint* InBlueprint,UEdGraph* InGraph);
 	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph);
+	virtual void						Fill					(ALegacyKismet* Kismet);
 	
 	UPROPERTY(BlueprintReadWrite)
 	FName VarName;
@@ -314,11 +327,42 @@ class REDUELEGACY_API ULegacySeqVar_Object : public ULegacySequenceVariable
 	GENERATED_BODY()
 public:
 	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						Fill					(ALegacyKismet* Kismet);
 	
 	UPROPERTY(BlueprintReadWrite)
 	ULegacyObject* ObjValue;
 	
 };
+
+UCLASS()
+class REDUELEGACY_API ULegacySeqVar_Named: public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						Fill					(ALegacyKismet* Kismet);
+
+	ULegacySequenceVariable*			FindVariable			();
+	UPROPERTY(Transient)
+	ULegacySequenceVariable* RefVariable;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName FindVarName;
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacySeqVar_ObjectList : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						Fill					(ALegacyKismet* Kismet);
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<ULegacyObject*> ObjList;
+	
+};
+
 
 UCLASS()
 class REDUELEGACY_API USeqAct_ToggleCinematicMode : public ULegacySequenceAction
@@ -368,12 +412,179 @@ public:
 
 
 UCLASS()
-class REDUELEGACY_API ULegacySeqAct_Interp : public ULegacySequenceAction
+class REDUELEGACY_API ULegacySeqAct_Interp : public ULegacySequenceImporter
 {
 	GENERATED_BODY()
 public:
-	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph);
-	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph);
+									ULegacySeqAct_Interp();
+	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	
+	virtual void					SimulatedImport	() override;
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXSeqAct_InstancePattern : public ULegacySequenceImporter
+{
+	GENERATED_BODY()
+public:
+	ULegacyXSeqAct_InstancePattern();
+
+	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+};
+
+
+UCLASS()
+class REDUELEGACY_API  ULegacyInterpTrack: public ULegacyObject
+{
+	
+public:
+	GENERATED_BODY()
+	
+	virtual void ExportToLevelSequence( const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction);
+};
+
+USTRUCT(BlueprintType)
+struct FLegacyToggleTrackKey
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadWrite)
+	float Time = 0;
+	UPROPERTY(BlueprintReadWrite)
+	bool ToggleAction = false;
+};
+
+UCLASS()
+class REDUELEGACY_API  ULegacyInterpTrackToggle: public ULegacyInterpTrack
+{
+	
+public:
+	GENERATED_BODY()
+	TArray<FLegacyToggleTrackKey> ToggleTrack;
+};
+
+
+USTRUCT(Blueprintable)
+struct FLegacyAnimControlTrackKey
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	float StartTime = 0.0f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName AnimSeqName;
+	
+	UPROPERTY(BlueprintReadWrite)
+	float AnimStartOffset = 0.0f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	float AnimEndOffset = 0.0f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	float AnimPlayRate  = 1.0f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool bLooping = false;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool bReverse = false;
+
+};
+
+UCLASS()
+class ULegacyInterpTrackAnimControl : public ULegacyInterpTrack
+{
+public:
+	GENERATED_BODY()
+	
+	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FLegacyAnimControlTrackKey> AnimSeqs;
+
+};
+
+USTRUCT(Blueprintable)
+struct FInterpCurveVector3fPoint
+{
+	GENERATED_BODY()
+	
+	/** Float input value that corresponds to this key (eg. time). */
+	UPROPERTY(BlueprintReadWrite)
+	float		InVal;
+
+	/** Output value of templated type when input is equal to InVal. */
+	UPROPERTY(BlueprintReadWrite)
+	FVector3f	OutVal;
+
+	/** Tangent of curve arrive this point. */
+	UPROPERTY(BlueprintReadWrite)
+	FVector3f	ArriveTangent; 
+
+	/** Tangent of curve leaving this point. */
+	UPROPERTY(BlueprintReadWrite)
+	FVector3f	LeaveTangent; 
+
+	/** Interpolation mode between this point and the next one. @see EInterpCurveMode */
+	UPROPERTY(BlueprintReadWrite)
+	TEnumAsByte<EInterpCurveMode>	InterpMode; 
+};
+
+USTRUCT(Blueprintable)
+struct FInterpCurveVector3f
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FInterpCurveVector3fPoint> Points;
+};
+
+
+UENUM()
+enum class ELegacyInterpTrackMoveFrame
+{
+	IMF_World,                      // 0
+	IMF_RelativeToInitial,          // 1
+	IMF_MAX                         // 2
+};
+
+UCLASS()
+class ULegacyInterpTrackMove : public ULegacyInterpTrack
+{
+public:
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	FInterpCurveVector3f PosTrack;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FInterpCurveVector3f EulerTrack;
+	
+	UPROPERTY(BlueprintReadWrite)
+	ELegacyInterpTrackMoveFrame MoveFrame = ELegacyInterpTrackMoveFrame::IMF_World;
+	
+	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
+	
+};
+UCLASS()
+class REDUELEGACY_API ULegacyInterpGroup : public ULegacyObject
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadWrite)
+	TArray<ULegacyInterpTrack*> InterpTracks;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName GroupName;
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<class ULegacyAnimSet*> GroupAnimSets;
+
+	
+	void			ExportToLevelSequence	(ULegacySeqAct_Interp* OwnerSeqAction ,const TSharedRef<ISequencer>&Sequencer);
+	UAnimSequence*	FindAnimSequence			(const FName&InName,USkeleton*Skeleton);
 };
 
 UCLASS()
@@ -383,8 +594,23 @@ class REDUELEGACY_API ULegacyInterpData : public ULegacySequenceVariable
 public:
 	UPROPERTY(BlueprintReadWrite)
 	float InterpLength;
-	
+
 	UPROPERTY(BlueprintReadWrite)
-	ULegacyObject* ObjValue;
+	TArray<ULegacyInterpGroup*> InterpGroups;
+
+	UPROPERTY(Transient)
+	ULegacySeqAct_Interp* OwnerSeqAct_Interp = nullptr;
+
+	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						Fill					(ALegacyKismet* Kismet) override;
+			ULevelSequence*				GetOrCreateLevel		();
+			void						ExportToLevelSequence	(ULegacySeqAct_Interp* OwnerSeqAction ,ULevelSequence* LevelSequence);
+			FGuid						FindOrCreateBinding		(USceneComponent& ComponentToBind,const FString&NameBinding);
+private:
 	
+	UPROPERTY(Transient)
+	ULevelSequence* LevelSequence;
+
+	UPROPERTY(Transient)
+	TMap<USceneComponent*,FGuid> BindingMap;
 };

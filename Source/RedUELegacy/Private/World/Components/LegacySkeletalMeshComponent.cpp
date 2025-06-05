@@ -27,8 +27,18 @@ void ULegacySkeletalMeshComponent::FillComponent_Implementation(UActorComponent*
 				}
 			}
 		}
+	
 		if (ULegacySkeletalMesh3*SkeletalMesh3 = Cast<ULegacySkeletalMesh3>(SkeletalMesh))
 		{
+			AActor* OuterActor = InActorComponent->GetOwner();
+			if (SkeletalMeshComponent == OuterActor->GetRootComponent())
+			{
+				if ((FQuat4f::Identity.Equals(FQuat4f(SkeletalMesh3->RotOrigin))&&SkeletalMesh3->MeshOrigin.IsNearlyZero()) )
+				{
+					return;
+				}
+			}
+			
 			FMatrix Transform = SkeletalMeshComponent->GetRelativeTransform().ToMatrixWithScale();
 			FMatrix RelativeTransform = FTransform(SkeletalMesh3->RotOrigin,FVector(SkeletalMesh3->MeshOrigin)).ToMatrixWithScale();
 			Transform = RelativeTransform*Transform;

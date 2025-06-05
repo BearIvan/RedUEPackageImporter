@@ -23,6 +23,8 @@ public class RedUELegacyGame : ModuleRules
                 "Projects",
                 "UnrealEd",
                 "RenderCore",
+                "LevelSequence",
+                "MovieScene"
             }
         );
         

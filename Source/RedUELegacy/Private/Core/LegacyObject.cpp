@@ -25,6 +25,38 @@ FLegacyRotator& FLegacyRotator::operator=(const FRotator3f& Rotator)
 	return *this;
 }
 
+bool FLegacyMatrix::Serialize(FArchive& Ar)
+{
+	FPlane4f PlaneX;
+	Ar<<PlaneX[3]<<PlaneX[0]<<PlaneX[1]<<PlaneX[2];
+	FPlane4f PlaneY;
+	Ar<<PlaneY[3]<<PlaneY[0]<<PlaneY[1]<<PlaneY[2];
+	FPlane4f PlaneZ;
+	Ar<<PlaneZ[3]<<PlaneZ[0]<<PlaneZ[1]<<PlaneZ[2];
+	FPlane4f PlaneW;
+	Ar<<PlaneW[3]<<PlaneW[0]<<PlaneW[1]<<PlaneW[2];
+
+	Data = FMatrix44f(PlaneX, PlaneY, PlaneZ, PlaneW);
+	return true;
+}
+
+FLegacyMatrix::operator FMatrix44f()
+{
+	return Data;
+}
+
+FLegacyMatrix::operator FMatrix()
+{
+	
+	return FMatrix(Data);
+}
+
+FLegacyMatrix& FLegacyMatrix::operator=(const FMatrix44f& InData)
+{
+	Data = InData;
+	return *this;
+}
+
 FLegacyRotator::operator FRotator3f()
 {
 	FRotator3f Rotation;
@@ -135,6 +167,7 @@ enum class EFLegacyPropType:int32
     FixedArrayProperty,	// NAME_InterfaceProperty in UE3
     DelegateProperty = 7,
     InterfaceProperty = 15,
+	XWeakReferenceProperty = 16,
 };
 
 static FName NAME_StringProperty = "StringProperty";
@@ -181,6 +214,7 @@ struct FLegacyPropertyTag
         { static_cast<int32>(EFLegacyPropType::FixedArrayProperty), NAME_FixedArrayProperty },
         { static_cast<int32>(EFLegacyPropType::DelegateProperty), NAME_DelegateProperty },
         { static_cast<int32>(EFLegacyPropType::InterfaceProperty), NAME_InterfaceProperty },
+        { static_cast<int32>(EFLegacyPropType::XWeakReferenceProperty), "XWeakReferenceProperty" },
         };
 	    
 		Ar << Tag.Name;
@@ -472,7 +506,9 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
             {
                 if(StructProperty->Struct->UseNativeSerialization())
                 {
-                    Ar.Serialize( StructProperty->ContainerPtrToValuePtr<void>(Object),StructProperty->Struct->GetPropertiesSize());
+                	UScriptStruct::ICppStructOps* TheCppStructOps = StructProperty->Struct->GetCppStructOps();
+                	TheCppStructOps->Serialize(Ar,StructProperty->ContainerPtrToValuePtr<void>(Object));
+                    //Ar.Serialize( StructProperty->ContainerPtrToValuePtr<void>(Object),StructProperty->Struct->GetPropertiesSize());
                 }
                 else
                 {

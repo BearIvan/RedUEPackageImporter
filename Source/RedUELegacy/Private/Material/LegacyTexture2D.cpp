@@ -84,8 +84,16 @@ UObject* ULegacyTexture2D::ExportToContent()
     	Texture2D->PreEditChange(nullptr);
     	FAssetRegistryModule::AssetCreated(Texture2D);
     	
+    	Texture2D->LODGroup = LODGroup;
+    	if (Texture2D->LODGroup == TEXTUREGROUP_WorldNormalMap)
+    	{
+    		Texture2D->CompressionSettings = TC_Normalmap;
+    	} 
+    	else if (IsHDR)
+    	{
+    		Texture2D->CompressionSettings = TC_HDR;
+    	}
     	Texture2D->Source.Init(Image.GetWidth(), Image.GetHeight(), 1, Image.GetMips(), IsHDR?TSF_RGBA16F:TSF_BGRA8, static_cast<uint8*>(*Image));
-	
         Texture2D->PostEditChange();
         Texture2D->Modify();
         

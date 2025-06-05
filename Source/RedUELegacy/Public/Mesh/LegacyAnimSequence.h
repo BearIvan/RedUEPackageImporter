@@ -212,6 +212,41 @@ struct FLegacyMorphemeAnimSectionData
 		return Ar;
 	}
 };
+struct FLegacyMorphemeTrajectorySourceBase
+{
+	int32 m_trajType;
+	void* Unknown0;
+	int32 Unknown1[4];
+};
+static_assert(sizeof(FLegacyMorphemeTrajectorySourceBase) == 0x20);
+
+
+
+struct FLegacyMorphemeTrajectoryPosKeyNSA
+{
+	uint32 Data;
+};
+
+struct FLegacyMorphemeTrajectoryQuatKeyNSA
+{
+	uint16 X;
+	uint16 Y;
+	uint16 Z;
+};
+
+
+struct FLegacyMorphemeTrajectorySourceQSA: FLegacyMorphemeTrajectorySourceBase
+{
+	float m_sampleFrequency;
+	int16 m_numAnimFrames;
+	int16 m_flags;
+	FLegacyMorphemeQuantisationInfoQSA m_sampledDeltaPosKeysInfo;
+	FLegacyMorphemeQuantisationInfoQSA m_sampledDeltaQuatKeysInfo;
+	FLegacyMorphemeTrajectoryPosKeyNSA * m_sampledDeltaPosKeys;
+	FLegacyMorphemeTrajectoryQuatKeyNSA * m_sampledDeltaQuatKeys;
+	void Unpack();
+};
+static_assert(sizeof(FLegacyMorphemeTrajectorySourceQSA) == 0x68);
 
 struct FLegacyMorphemeAnimSourceTypeQSA : FLegactMorphemeAnimSourceBase
 {
@@ -222,7 +257,7 @@ struct FLegacyMorphemeAnimSourceTypeQSA : FLegactMorphemeAnimSourceBase
 	FLegacyMorphemeAnimSectionInfoQSA*		SectionsInfo;
 	FLegacyMorphemeAnimChannelSetInfoQSA*	ChannelSetsInfo;
 	FLegacyMorphemeAnimSectionQSA**			Sections;
-	void*									TrajectoryData;
+	FLegacyMorphemeTrajectorySourceQSA*		TrajectoryData;
 	void*									ChannelNames;
 	void									Unpack(const TArray<FLegacyMorphemeAnimSectionData>& SectionData, int32 AnimDataSize);
 };
@@ -335,7 +370,8 @@ struct FLegacyMorphemeAnimSourceTypeNSA : FLegactMorphemeAnimSourceBase
 	FLegactMorphemeAnimSectionInfoNSA*		SectionsInfo;
 	FLegacyMorphemeAnimChannelSetInfoNSA*	ChannelSetsInfo;
 	FLegacyMorphemeAnimSectionNSA**			Sections;
-	void*									TrajectoryData;
+	//NSA too
+	FLegacyMorphemeTrajectorySourceQSA*		TrajectoryData;
 	void*									ChannelNames;
 	void									Unpack(const TArray<FLegacyMorphemeAnimSectionData>& SectionData, int32 AnimDataSize);
 };
@@ -343,28 +379,7 @@ struct FLegacyMorphemeAnimSourceTypeNSA : FLegactMorphemeAnimSourceBase
 static_assert(sizeof(FLegacyMorphemeAnimSourceTypeNSA) == 0x58);
 
 
-struct FLegacyMorphemeHierarchy
-{
-	int32	NumEntries;
-	int32*	HierarchyArray;
-	void	Unpack();
-};
 
-static_assert(sizeof(FLegacyMorphemeHierarchy) == 0x10);
-
-struct FLegacyMorphemeAnimRigDef
-{
-	FQuat4f						BlendFrameOrientation;
-	FVector3f					BlendFrameTranslation;
-	FLegacyMorphemeHierarchy*	Hierarchy;
-	int32						TrajectoryBoneIndex;
-	int32						CharacterRootBoneIndex;
-	void*						BoneNameMap;
-	void*						BindPose;
-	void						Unpack();
-};
-
-static_assert(sizeof(FLegacyMorphemeAnimRigDef) == 0x40);
 
 UCLASS()
 class REDUELEGACY_API ULegacyMorphemeAnimSequence : public ULegacyAnimSequence
@@ -372,10 +387,10 @@ class REDUELEGACY_API ULegacyMorphemeAnimSequence : public ULegacyAnimSequence
 	GENERATED_BODY()
 
 public:
-	virtual void									FillRawAnimData	(ULegacyAnimSet* OwnerAnimSet) override;
-	virtual void									LegacySerialize	(FRedUELegacyArchive& Ar) override;
-	virtual void									BuildAnimation	(USkeleton* Skeleton, ULegacyAnimSet* OwnerAnimSet, IAnimationDataController& Controller, bool bShouldTransact) override;
-	virtual bool									CanImport		() override;
+	virtual void									FillRawAnimData		(ULegacyAnimSet* OwnerAnimSet) override;
+	virtual void									LegacySerialize		(FRedUELegacyArchive& Ar) override;
+	virtual void									BuildAnimation		(USkeleton* Skeleton, ULegacyAnimSet* OwnerAnimSet, IAnimationDataController& Controller, bool bShouldTransact) override;
+	virtual bool									CanImport			() override;
 	
 			FRedUELegacyByteBulkData				AnimSourceData;
 			FRedUELegacyByteBulkData				CompiledAnimDataPC32;
@@ -386,7 +401,6 @@ public:
 			TArray<FLegacyMorphemeAnimSectionData>	CompiledAnimSectionDataPC64;
 			TArray<FLegacyMorphemeAnimSectionData>	CompiledAnimSectionDataX360;
 			TArray<FLegacyMorphemeAnimSectionData>	CompiledAnimSectionDataPS3;
-
 	UPROPERTY(BlueprintReadWrite)
 	int32 AnimationFormat = 2;
 };

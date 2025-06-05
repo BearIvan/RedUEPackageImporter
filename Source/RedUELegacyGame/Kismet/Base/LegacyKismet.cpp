@@ -49,3 +49,6 @@ USequenceAction* ALegacyKismet::GetSequenceAction(FGuid ActionGuid, TSubclassOf<
 	return nullptr;
 }
 
+ABioshockKismet::ABioshockKismet(): ElizabethPawn(nullptr)
+{
+}

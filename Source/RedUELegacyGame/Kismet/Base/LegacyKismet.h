@@ -18,3 +18,20 @@ public:
 	UPROPERTY(VisibleInstanceOnly)
 	TMap<FGuid,USequenceAction*> SequenceActions;
 };
+
+
+
+UCLASS()
+class REDUELEGACYGAME_API ABioshockKismet : public ALegacyKismet
+{
+	GENERATED_BODY()
+
+public:
+	ABioshockKismet();
+
+	UPROPERTY(BlueprintReadOnly, Category="Kismet|Bioshock")
+	bool ElizabethIsActive = false;
+
+	UPROPERTY(BlueprintReadOnly, Category="Kismet|Bioshock")
+	APawn* ElizabethPawn;
+};

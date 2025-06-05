@@ -5,7 +5,13 @@ void ULegacyLightComponent::FillComponent_Implementation(UActorComponent* InActo
 	Super::FillComponent_Implementation(InActorComponent);
 	ULightComponent* LightComponent =  CastChecked<ULightComponent>(InActorComponent);
 	LightComponent->LightColor = LightColor;
-	LightComponent->Intensity = Brightness;
+	if (ULocalLightComponent* LocalLightComponent = CastChecked<ULocalLightComponent>(LightComponent))
+	{
+		LocalLightComponent->IntensityUnits = ELightUnits::EV;
+	}
+	LightComponent->SetMobility( EComponentMobility::Movable);
+	LightComponent->SetIntensity(Brightness);
+	
 }
 
 void ULegacyPointLightComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
@@ -17,7 +23,7 @@ void ULegacyPointLightComponent::FillComponent_Implementation(UActorComponent* I
 	{
 		PointLightComponent->SetRelativeLocation(FVector(Translation));
 	}
-	PointLightComponent->SetSourceRadius(Radius);
+	PointLightComponent->SetAttenuationRadius(Radius);
 }
 
 void ULegacySpotLightComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
@@ -26,9 +32,22 @@ void ULegacySpotLightComponent::FillComponent_Implementation(UActorComponent* In
 	USpotLightComponent* SpotLightComponent =  CastChecked<USpotLightComponent>(InActorComponent);
 	SpotLightComponent->InnerConeAngle = InnerConeAngle;
 	SpotLightComponent->OuterConeAngle = OuterConeAngle;
-	if (SpotLightComponent->GetAttachmentRootActor()->GetRootComponent() != InActorComponent)
-	{
-		SpotLightComponent->SetRelativeRotation(Rotation);
-	}
+	static FQuat NeedRotation = FQuat(FRotator(-90.f, 0, 0));
+	FQuat SpotRotation = SpotLightComponent->GetComponentQuat();
+	SpotRotation = SpotRotation*NeedRotation;
+	SpotLightComponent->SetWorldRotation(SpotRotation);
+	
+	
+	// if (SpotLightComponent->GetAttachmentRootActor()->GetRootComponent() != InActorComponent)
+	// {
+	// 	Rotation.Pitch -= 90.f;
+	// 	SpotLightComponent->SetRelativeRotation(Rotation);
+	// }
+	// else
+	// {
+	// 	FRotator Rotator = SpotLightComponent->GetComponentRotation();
+	// 	Rotator.Pitch -= 90.f;
+	// 	SpotLightComponent->SetWorldRotation(Rotator);
+	// }
 	
 }

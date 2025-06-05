@@ -29,6 +29,7 @@ enum class ELegacyMaterialLightingModel
 	MLM_Anisotropic         =5,
 };
 
+
 USTRUCT(BlueprintType)
 struct FLegacyMaterialInput
 {

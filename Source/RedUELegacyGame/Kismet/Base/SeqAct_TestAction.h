@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "Base/SequenceAction.h"
+#include "SequenceAction.h"
 #include "SeqAct_TestAction.generated.h"
 
 UCLASS(MinimalAPI)
@@ -13,7 +13,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	
-	UFUNCTION(BlueprintCallable,meta=(KismetInput))
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 0))
 	void Test1();
 	
 	UFUNCTION(BlueprintCallable,meta=(KismetInput))

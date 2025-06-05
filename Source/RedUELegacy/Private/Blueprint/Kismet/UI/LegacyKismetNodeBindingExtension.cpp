@@ -23,6 +23,10 @@ bool FLegacyKismetNodeBindingExtension::IsPropertyExtendable(const UClass* InObj
 		USequenceAction* SequenceAction  = Cast<USequenceAction>(Objects[0]);
 		if (SequenceAction != nullptr)
 		{
+			if (FArrayProperty* ArrayProperty =  CastField<FArrayProperty>(Property->GetOwnerProperty()))
+			{
+				return ArrayProperty->HasMetaData(TEXT("KismetExternalVariable"));
+			}
 			return Property->HasMetaData(TEXT("KismetExternalVariable"));
 		}
 	}
@@ -38,6 +42,19 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 
 	FProperty* NodeProperty = InPropertyHandle->GetProperty();
 	TSharedPtr<IPropertyHandle> ParentHandle = InPropertyHandle->GetParentHandle();
+
+	FArrayProperty* OwnerArrayProperty = CastField<FArrayProperty>(NodeProperty->GetOwnerProperty());
+	
+	if (OwnerArrayProperty == NodeProperty)
+	{
+		OwnerArrayProperty = nullptr;
+	}
+	
+	FProperty* OwnerProperty = NodeProperty;
+	if (OwnerArrayProperty)
+	{
+		OwnerProperty = OwnerArrayProperty;
+	}
 	
 	if(IModularFeatures::Get().IsModularFeatureAvailable("PropertyAccessEditor"))
 	{
@@ -56,10 +73,24 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 			return TEXT("NewFunction");
 		};
 		
-		auto OnCanBindProperty = [NodeProperty](FProperty* InProperty)
+		auto OnCanBindProperty = [NodeProperty,OwnerArrayProperty](FProperty* InProperty)
 		{
+			
 			IPropertyAccessEditor& PropertyAccessEditor = IModularFeatures::Get().GetModularFeature<IPropertyAccessEditor>("PropertyAccessEditor");
-			return NodeProperty && PropertyAccessEditor.GetPropertyCompatibility(InProperty, NodeProperty) != EPropertyAccessCompatibility::Incompatible;\
+			if (OwnerArrayProperty)
+			{
+				if (PropertyAccessEditor.GetPropertyCompatibility(InProperty, OwnerArrayProperty) != EPropertyAccessCompatibility::Incompatible)
+				{
+					return true;
+				}
+			}
+			
+			if (NodeProperty)
+			{
+				return PropertyAccessEditor.GetPropertyCompatibility(InProperty, NodeProperty) != EPropertyAccessCompatibility::Incompatible;
+			}
+			
+			return false;
 		};
 
 		auto OnGoToBinding = [InPropertyHandle, Blueprint](FName InPropertyName)
@@ -77,7 +108,7 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 			return false;
 		};
 
-		auto OnAddBinding = [InPropertyHandle, Blueprint,NodeProperty,SequenceAction](FName InPropertyName, const TArray<FBindingChainElement>& InBindingChain)
+		auto OnAddBinding = [InPropertyHandle, Blueprint,OwnerProperty,OwnerArrayProperty,SequenceAction](FName InPropertyName, const TArray<FBindingChainElement>& InBindingChain)
 		{
 			void* Data = nullptr;
 			const FPropertyAccess::Result Result = InPropertyHandle->GetValueData(Data);
@@ -85,7 +116,7 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 			{
 				SequenceAction->PreEditChange(nullptr);
 				
-				FMemberReference& MemberReference =  SequenceAction->PropertiesReference.FindOrAdd(NodeProperty->GetFName());
+
 				FProperty* InProperty = InBindingChain[0].Field.Get<FProperty>();
 				UClass* OwnerClass = InProperty ? InProperty->GetOwnerClass() : nullptr;
 				bool bSelfContext = false;
@@ -94,25 +125,62 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 					bSelfContext = (Blueprint->GeneratedClass != nullptr && Blueprint->GeneratedClass->IsChildOf(OwnerClass)) ||
 									(Blueprint->SkeletonGeneratedClass != nullptr && Blueprint->SkeletonGeneratedClass->IsChildOf(OwnerClass));
 				}
-				MemberReference.SetFromField<FProperty>(InProperty, bSelfContext);
-
+				
+				if (OwnerArrayProperty)
+				{
+					FSequenceActionPropertyArrayReference& MemberReference =  SequenceAction->PropertiesArrayReference.FindOrAdd(OwnerProperty->GetFName());
+					MemberReference.ArrayElementReference.FindOrAdd(InPropertyHandle->GetArrayIndex()).SetFromField<FProperty>(InProperty, bSelfContext);
+				}
+				else
+				{
+		
+					FMemberReference& MemberReference =  SequenceAction->PropertiesReference.FindOrAdd(OwnerProperty->GetFName());
+					MemberReference.SetFromField<FProperty>(InProperty, bSelfContext);
+				}
+				
 				SequenceAction->PostEditChange();
 				SequenceAction->Modify();
 				FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
 			}
 		};
 
-		auto OnRemoveBinding = [SequenceAction,NodeProperty,Blueprint](FName InPropertyName)
+		auto OnRemoveBinding = [SequenceAction,OwnerProperty,InPropertyHandle,OwnerArrayProperty,Blueprint](FName InPropertyName)
 		{
 			SequenceAction->PreEditChange(nullptr);
-			SequenceAction->PropertiesReference.Remove(NodeProperty->GetFName());
+			if (OwnerArrayProperty)
+			{
+				if (FSequenceActionPropertyArrayReference* MemberReference =  SequenceAction->PropertiesArrayReference.Find(OwnerProperty->GetFName()))
+				{
+					MemberReference->ArrayElementReference.Remove(InPropertyHandle->GetArrayIndex());
+					if (MemberReference->ArrayElementReference.Num() == 0)
+					{
+						SequenceAction->PropertiesArrayReference.Remove(OwnerProperty->GetFName());
+					}
+				}
+
+			}
+			else
+			{
+				SequenceAction->PropertiesReference.Remove(OwnerProperty->GetFName());
+			}
 			SequenceAction->PostEditChange();
 			FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
 		};
 
-		auto CanRemoveBinding = [SequenceAction,NodeProperty](FName InPropertyName)
+		auto CanRemoveBinding = [SequenceAction,OwnerProperty,InPropertyHandle,OwnerArrayProperty](FName InPropertyName)
 		{
-			return SequenceAction->PropertiesReference.Contains(NodeProperty->GetFName());
+			if (OwnerArrayProperty)
+			{
+				if (FSequenceActionPropertyArrayReference* MemberReference =  SequenceAction->PropertiesArrayReference.Find(OwnerProperty->GetFName()))
+				{
+					return MemberReference->ArrayElementReference.Contains(InPropertyHandle->GetArrayIndex());
+				}
+			}
+			if (SequenceAction->PropertiesReference.Contains(OwnerProperty->GetFName()))
+			{
+				return true;
+			}
+			return false;
 		};
 
 		auto OnNewFunctionBindingCreated = [](UEdGraph* InFunctionGraph, UFunction* InFunction)
@@ -120,13 +188,34 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 			// Ensure newly created function is thread safe 
 		};
 
-		auto CurrentBindingText = [SequenceAction, NodeProperty,InPropertyHandle,Blueprint,OuterObjects]()
+		auto CurrentBindingText = [SequenceAction, OwnerProperty,NodeProperty,OwnerArrayProperty,InPropertyHandle,Blueprint,OuterObjects]()
 		{
 			void* Data = nullptr;
 			const FPropertyAccess::Result Result = InPropertyHandle->GetValueData(Data);
 			if(Result == FPropertyAccess::Success && OuterObjects.Num() == 1)
 			{
-				if (FMemberReference* MemberReference = SequenceAction->PropertiesReference.Find(NodeProperty->GetFName()))
+				if (OwnerArrayProperty)
+				{
+					if (FSequenceActionPropertyArrayReference* MemberReference = SequenceAction->PropertiesArrayReference.Find(OwnerProperty->GetFName()))
+					{
+						if (FMemberReference* ArrayMemberReference = MemberReference->ArrayElementReference.Find(InPropertyHandle->GetArrayIndex()))
+						{
+							if(FProperty* Property = ArrayMemberReference->ResolveMember<FProperty>(Blueprint->SkeletonGeneratedClass))
+							{
+								return FText::FromName(Property->GetFName());
+							}
+							else
+							{
+								return FText::FromName(ArrayMemberReference->GetMemberName());
+							}
+						}
+					}
+					else
+					{
+						return FText::FromName(NAME_None);
+					}
+				}
+				else if (FMemberReference* MemberReference = SequenceAction->PropertiesReference.Find(OwnerProperty->GetFName()))
 				{
 					if(FProperty* Property = MemberReference->ResolveMember<FProperty>(Blueprint->SkeletonGeneratedClass))
 					{
@@ -146,21 +235,45 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 			return FText::FromName(NAME_None);
 		};
 
-		auto CurrentBindingToolTipText = [InPropertyHandle,SequenceAction,NodeProperty,Blueprint]()
+		auto CurrentBindingToolTipText = [InPropertyHandle,SequenceAction, OwnerProperty,NodeProperty,OwnerArrayProperty,Blueprint,OuterObjects]()
 		{
 			void* StructData = nullptr;
 			const FPropertyAccess::Result Result = InPropertyHandle->GetValueData(StructData);
 			if(Result == FPropertyAccess::Success)
 			{
-				if (FMemberReference* MemberReference = SequenceAction->PropertiesReference.Find(NodeProperty->GetFName()))
+				if(Result == FPropertyAccess::Success && OuterObjects.Num() == 1)
 				{
-					if(FProperty* Property = MemberReference->ResolveMember<FProperty>(Blueprint->SkeletonGeneratedClass))
+					if (OwnerArrayProperty)
 					{
-						return FText::FromName(Property->GetFName());
+						if (FSequenceActionPropertyArrayReference* MemberReference = SequenceAction->PropertiesArrayReference.Find(OwnerProperty->GetFName()))
+						{
+							if (FMemberReference* ArrayMemberReference = MemberReference->ArrayElementReference.Find(InPropertyHandle->GetArrayIndex()))
+							{
+								if(FProperty* Property = ArrayMemberReference->ResolveMember<FProperty>(Blueprint->SkeletonGeneratedClass))
+								{
+									return FText::FromName(Property->GetFName());
+								}
+								else
+								{
+									return FText::FromName(ArrayMemberReference->GetMemberName());
+								}
+							}
+						}
+						else
+						{
+							return FText::FromName(NAME_None);
+						}
 					}
-					else
+					else if (FMemberReference* MemberReference = SequenceAction->PropertiesReference.Find(OwnerProperty->GetFName()))
 					{
-						return FText::FromName(MemberReference->GetMemberName());
+						if(FProperty* Property = MemberReference->ResolveMember<FProperty>(Blueprint->SkeletonGeneratedClass))
+						{
+							return FText::FromName(Property->GetFName());
+						}
+						else
+						{
+							return FText::FromName(MemberReference->GetMemberName());
+						}
 					}
 				}
 			}
@@ -171,11 +284,29 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 
 			return FText::GetEmpty();
 		};
-		auto CurrentBindingImage = [NodeProperty]()
+		auto CurrentBindingImage = [NodeProperty,OwnerArrayProperty,SequenceAction,OwnerProperty,InPropertyHandle,Blueprint]()
 		{
 			static FName PropertyIcon(TEXT("Kismet.VariableList.TypeIcon"));
 			const UEdGraphSchema_K2* GraphSchema = GetDefault<UEdGraphSchema_K2>();
 			FEdGraphPinType PinType;
+
+			if (OwnerArrayProperty)
+			{
+				if (FSequenceActionPropertyArrayReference* MemberReference = SequenceAction->PropertiesArrayReference.Find(OwnerProperty->GetFName()))
+				{
+					if (FMemberReference* ArrayMemberReference = MemberReference->ArrayElementReference.Find(InPropertyHandle->GetArrayIndex()))
+					{
+						if(FProperty* Property = ArrayMemberReference->ResolveMember<FProperty>(Blueprint->SkeletonGeneratedClass))
+						{
+							if(GraphSchema->ConvertPropertyToPinType(Property, PinType))
+							{
+								return FBlueprintEditorUtils::GetIconFromPin(PinType, false);
+							}
+						}
+					}
+				}
+			}
+			
 			if(NodeProperty != nullptr && GraphSchema->ConvertPropertyToPinType(NodeProperty, PinType))
 			{
 				return FBlueprintEditorUtils::GetIconFromPin(PinType, false);
@@ -185,19 +316,30 @@ void FLegacyKismetNodeBindingExtension::ExtendWidgetRow(FDetailWidgetRow& InWidg
 				return FAppStyle::GetBrush(PropertyIcon);
 			}
 		};
-		auto CurrentBindingColor = [NodeProperty,SequenceAction]()
+		auto CurrentBindingColor = [OwnerProperty,SequenceAction,InPropertyHandle]()
 		{
 			static FName PropertyIcon(TEXT("Kismet.VariableList.TypeIcon"));
 			const UEdGraphSchema_K2* GraphSchema = GetDefault<UEdGraphSchema_K2>();
 			FEdGraphPinType PinType;
-			if(NodeProperty != nullptr && SequenceAction->PropertiesReference.Contains(NodeProperty->GetFName()) && GraphSchema->ConvertPropertyToPinType(NodeProperty, PinType))
+			if (OwnerProperty)
 			{
-				return GraphSchema->GetPinTypeColor(PinType);
+				if (GraphSchema->ConvertPropertyToPinType(OwnerProperty, PinType))
+				{
+					if( SequenceAction->PropertiesReference.Contains(OwnerProperty->GetFName()))
+					{
+						return GraphSchema->GetPinTypeColor(PinType);
+					}
+					if (FSequenceActionPropertyArrayReference* PropertyArrayReference = SequenceAction->PropertiesArrayReference.Find(OwnerProperty->GetFName()))
+					{
+						if (PropertyArrayReference->ArrayElementReference.Contains(InPropertyHandle->GetArrayIndex()))
+						{
+							return GraphSchema->GetPinTypeColor(PinType);
+						}
+					}
+				}
 			}
-			else
-			{
-				return FAppStyle::GetSlateColor("Colors.Foreground").GetSpecifiedColor();
-			}
+			
+			return FAppStyle::GetSlateColor("Colors.Foreground").GetSpecifiedColor();
 		};
 	
 		FPropertyBindingWidgetArgs Args;

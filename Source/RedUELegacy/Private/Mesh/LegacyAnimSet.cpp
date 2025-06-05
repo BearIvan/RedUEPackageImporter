@@ -43,3 +43,23 @@ void ULegacyMorphemeAnimSet::LegacySerialize(FRedUELegacyArchive& Ar)
 	CompiledRigToAnimMapDataX360.Serialize(Ar);
 	CompiledRigToAnimMapDataPS3.Serialize(Ar);
 }
+
+FLegacyMorphemeAnimRigToAnimMap* ULegacyMorphemeAnimSet::GetAnimRigToAnimMap()
+{
+	if (CurrentAnimRigToAnimMap == nullptr)
+	{
+		CurrentAnimRigToAnimMap = reinterpret_cast<FLegacyMorphemeAnimRigToAnimMap*>(CompiledRigToAnimMapDataPC64.BulkData+48);
+		CurrentAnimRigToAnimMap->Unpack();
+	}
+	return CurrentAnimRigToAnimMap;
+}
+
+FLegacyMorphemeAnimRigDef* ULegacyMorphemeAnimSet::GetAnimRigDef()
+{
+	if (CurrentAnimRigDef == nullptr)
+	{
+		CurrentAnimRigDef = reinterpret_cast<FLegacyMorphemeAnimRigDef*>(CompiledRigDataPC64.BulkData+48);
+		CurrentAnimRigDef->Unpack();
+	}
+	return CurrentAnimRigDef;
+}

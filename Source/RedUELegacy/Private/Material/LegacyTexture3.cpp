@@ -33,7 +33,6 @@ RedImageTool::RedTexturePixelFormat ULegacyTexture3::Convert(ELegacyPixelFormat 
 		*OutIsHDR = true;
 		return RedImageTool::RedTexturePixelFormat::R32G32B32A32F;
 	case ELegacyPixelFormat::PF_A8R8G8B8:
-		*OutIsHDR = true;
 		return RedImageTool::RedTexturePixelFormat::R8G8B8A8;
 	case ELegacyPixelFormat::PF_G8:
 		return RedImageTool::RedTexturePixelFormat::R8;

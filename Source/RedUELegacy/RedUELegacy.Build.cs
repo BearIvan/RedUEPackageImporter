@@ -58,7 +58,11 @@ public class RedUELegacy : ModuleRules
                 "KismetCompiler",
                 "AssetDefinition",
                 "Kismet",
-                "PropertyEditor"
+                "PropertyEditor", 
+                "LevelSequence", 
+                "MovieScene", 
+                "Sequencer",
+                "MovieSceneTracks", 
                 // ... add private dependencies that you statically link with here ...	
 			}
 			);

@@ -957,6 +957,31 @@ void FLegacyMorphemeAnimSectionQSA::Unpack()
 	ensure(reinterpret_cast<uint8*>(AnimSection) + AnimSection->SectionSize >  AnimSectionData);
 }
 
+void FLegacyMorphemeTrajectorySourceQSA::Unpack()
+{
+	FLegacyMorphemeTrajectorySourceQSA* TrajectorySource = this;
+	uint8* TrajectorySourceData = reinterpret_cast<uint8*>(TrajectorySource) + sizeof(FLegacyMorphemeTrajectorySourceQSA);
+
+	auto UnpackData = [&TrajectorySourceData]<typename T>(T*& Ptr, int32 Count)
+	{
+		Ptr = reinterpret_cast<T*>(TrajectorySourceData);
+		TrajectorySourceData += sizeof(T) * Count;
+		TrajectorySourceData = Align(TrajectorySourceData, 4);
+	};
+
+	m_sampledDeltaPosKeys = nullptr;
+	if ( m_numAnimFrames )
+	{
+		UnpackData(m_sampledDeltaPosKeys,m_numAnimFrames);
+	}
+	
+	m_sampledDeltaQuatKeys = nullptr;
+	if ( m_numAnimFrames )
+	{
+		UnpackData(m_sampledDeltaQuatKeys,m_numAnimFrames);
+	}
+}
+
 void FLegacyMorphemeAnimSourceTypeQSA::Unpack(const TArray<FLegacyMorphemeAnimSectionData>& SectionData, int32 AnimDataSize)
 {
 	ChannelSetsInfo = reinterpret_cast<FLegacyMorphemeAnimChannelSetInfoQSA*>(reinterpret_cast<uint8*>(ChannelSetsInfo) + reinterpret_cast<int64>(this));
@@ -970,6 +995,8 @@ void FLegacyMorphemeAnimSourceTypeQSA::Unpack(const TArray<FLegacyMorphemeAnimSe
 		Sections[i]->Unpack();
 	}
 	SectionsInfo = reinterpret_cast<FLegacyMorphemeAnimSectionInfoQSA*>(reinterpret_cast<uint8*>(SectionsInfo) + reinterpret_cast<int64>(this));
+	TrajectoryData = reinterpret_cast<FLegacyMorphemeTrajectorySourceQSA*>(reinterpret_cast<uint8*>(TrajectoryData) + reinterpret_cast<int64>(this));
+	TrajectoryData->Unpack();
 }
 
 void FLegacyMorphemeAnimChannelSetInfoNSA::Unpack()
@@ -1083,6 +1110,9 @@ void FLegacyMorphemeAnimSourceTypeNSA::Unpack(const TArray<FLegacyMorphemeAnimSe
 		Sections[i]->Unpack();
 	}
 	SectionsInfo = reinterpret_cast<FLegactMorphemeAnimSectionInfoNSA*>(reinterpret_cast<uint8*>(SectionsInfo) + reinterpret_cast<int64>(this));
+
+	TrajectoryData = reinterpret_cast<FLegacyMorphemeTrajectorySourceQSA*>(reinterpret_cast<uint8*>(TrajectoryData) + reinterpret_cast<int64>(this));
+	TrajectoryData->Unpack();
 }
 
 
@@ -1143,11 +1173,11 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 	{
 		FLegacyMorphemeAnimSourceTypeNSA* AnimSourceDataTypeNSA = reinterpret_cast<FLegacyMorphemeAnimSourceTypeNSA*>(CompiledAnimDataPC64.BulkData);
 		AnimSourceDataTypeNSA->Unpack(CompiledAnimSectionDataPC64, CompiledAnimDataPC64.ElementCount);
-		FLegacyMorphemeAnimRigToAnimMap* RigToAnimMap = reinterpret_cast<FLegacyMorphemeAnimRigToAnimMap*>(MorphemeAnimSet->CompiledRigToAnimMapDataPC64.BulkData+48);
-		RigToAnimMap->Unpack();
-
-		FLegacyMorphemeAnimRigDef* RigDef = reinterpret_cast<FLegacyMorphemeAnimRigDef*>(MorphemeAnimSet->CompiledRigDataPC64.BulkData+48);
-		RigDef->Unpack();
+		FLegacyMorphemeAnimRigToAnimMap* RigToAnimMap = MorphemeAnimSet->GetAnimRigToAnimMap();
+		
+		FLegacyMorphemeAnimRigDef* RigDef =  MorphemeAnimSet->GetAnimRigDef();
+		
+		
 		FLegacyMorphemeAnimChannelSetInfoNSA* ChannelSetsInfo = AnimSourceDataTypeNSA->ChannelSetsInfo;
 
 		
@@ -1157,6 +1187,48 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 		
 		KeyPositions.AddZeroed(RigToAnimMap->m_numRigBones);
 		KeyRotations.AddZeroed(RigToAnimMap->m_numRigBones);
+
+
+		TArray<FVector3f> RootPositions;
+		TArray<FQuat4f> RootRotations;
+		FLegacyMorphemeTrajectorySourceQSA* TrajectoryData = AnimSourceDataTypeNSA->TrajectoryData;
+		for (int32 Key = 0; Key < TrajectoryData->m_numAnimFrames; Key++)
+		{
+			FVector3f&KeyPosition = RootPositions.AddDefaulted_GetRef();
+			if (TrajectoryData->m_flags&0x1)
+			{
+				KeyPosition.X = static_cast<float>((TrajectoryData->m_sampledDeltaPosKeys[ Key].Data >> 21) & 0x7FF);  // 11 bits
+				KeyPosition.Y = static_cast<float>((TrajectoryData->m_sampledDeltaPosKeys[Key].Data >> 10) & 0x7FF);  // 11 bits
+				KeyPosition.Z = static_cast<float>(TrajectoryData->m_sampledDeltaPosKeys[Key].Data & 0x3FF);   // 10 bits
+				KeyPosition *= TrajectoryData->m_sampledDeltaPosKeysInfo.Min;
+				KeyPosition += TrajectoryData->m_sampledDeltaPosKeysInfo.Max;
+			}
+			else
+			{
+				KeyPosition = TrajectoryData->m_sampledDeltaPosKeysInfo.Min;
+			}
+
+			
+			if (TrajectoryData->m_flags&(0x1<<8))
+			{
+				FVector3f KeyRotation;
+				KeyRotation.X = static_cast<float>(TrajectoryData->m_sampledDeltaQuatKeys[ Key].X);  // 11 bits
+				KeyRotation.Y = static_cast<float>(TrajectoryData->m_sampledDeltaQuatKeys[ Key].Y);  // 11 bits
+				KeyRotation.Z = static_cast<float>(TrajectoryData->m_sampledDeltaQuatKeys[ Key].Z);   // 10 bits
+				KeyRotation *= TrajectoryData->m_sampledDeltaQuatKeysInfo.Min;
+				KeyRotation += TrajectoryData->m_sampledDeltaQuatKeysInfo.Max;
+				RootRotations.Add(VectorToQuat(KeyRotation));
+			}
+			else
+			{
+				FQuat4f&KeyRotation = RootRotations.AddDefaulted_GetRef();
+				KeyRotation.X = TrajectoryData->m_sampledDeltaQuatKeysInfo.Min.X;
+				KeyRotation.Y = TrajectoryData->m_sampledDeltaQuatKeysInfo.Min.Y;
+				KeyRotation.Z = TrajectoryData->m_sampledDeltaQuatKeysInfo.Min.Z;
+				KeyRotation.W = TrajectoryData->m_sampledDeltaQuatKeysInfo.Max.X;
+			}
+		}
+		
 		for (int32 SectionID = 0; SectionID < AnimSourceDataTypeNSA->NumSections; SectionID++)
 		{
 			FLegacyMorphemeAnimSectionNSA* Section = AnimSourceDataTypeNSA->Sections[SectionID];
@@ -1247,6 +1319,8 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 		}
 		NumFrames = 0;
 		SequenceLength = AnimSourceDataTypeNSA->Duration;
+		FName RootBoneName = Skeleton->GetReferenceSkeleton().GetBoneName(0);
+		
 		for (int32 RigIndex = 1; RigIndex <KeyPositions.Num(); RigIndex++)
 		{
 			check(KeyPositions[RigIndex].Num() == KeyRotations[RigIndex].Num())
@@ -1254,20 +1328,7 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 			{
 				continue;
 			}
-			FName BoneName = OwnerAnimSet->TrackBoneNames[RigIndex-1];
-			TArray<FVector> PosKeys;
-			TArray<FQuat> RotKeys;
-			TArray<FVector> ScaleKeys;
-			for (int32 FrameIndex = 0; FrameIndex < KeyPositions[RigIndex].Num(); ++FrameIndex)
-			{
-				FVector3f PosKey = KeyPositions[RigIndex][FrameIndex]*50.f;
-				FQuat4f RotKey = KeyRotations[RigIndex][FrameIndex];
-				FVector3f ScaleKey = {1, 1, 1};
-				PosKeys.Add(FVector(PosKey.X, PosKey.Y, PosKey.Z));
-				RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, RotKey.W));
-				ScaleKeys.Add(FVector(ScaleKey.X, ScaleKey.Y, ScaleKey.Z));
-				
-			}
+
 			if (NumFrames == 0)
 			{
 				NumFrames = KeyPositions[RigIndex].Num();
@@ -1277,6 +1338,30 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 				ensure(NumFrames == KeyPositions[RigIndex].Num());
 			}
 
+			
+			FName BoneName = OwnerAnimSet->TrackBoneNames[RigIndex-1];
+			TArray<FVector> PosKeys;
+			TArray<FQuat> RotKeys;
+			TArray<FVector> ScaleKeys;
+			for (int32 FrameIndex = 0; FrameIndex < KeyPositions[RigIndex].Num(); ++FrameIndex)
+			{
+				FVector3f PosKey = KeyPositions[RigIndex][FrameIndex]*50.f;
+				FQuat4f RotKey = KeyRotations[RigIndex][FrameIndex];
+				FVector3f ScaleKey = {1, 1, 1};
+
+				if (RootBoneName == BoneName&&FrameIndex<TrajectoryData->m_numAnimFrames&&ensure(TrajectoryData->m_sampleFrequency == AnimSourceDataTypeNSA->SampleFrequency))
+				{
+					FTransform3f TrajectoryTransform = FTransform3f(RootRotations[FrameIndex],RootPositions[FrameIndex]*50);
+					PosKey = TrajectoryTransform.TransformPosition(PosKey);
+					RotKey = TrajectoryTransform.TransformRotation(RotKey);
+				}
+				
+				PosKeys.Add(FVector(PosKey.X, PosKey.Y, PosKey.Z));
+				RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, RotKey.W));
+				ScaleKeys.Add(FVector(ScaleKey.X, ScaleKey.Y, ScaleKey.Z));
+				
+			}
+			
 			Controller.AddBoneCurve(BoneName, bShouldTransact);
 			Controller.SetBoneTrackKeys(BoneName, PosKeys, RotKeys, ScaleKeys, bShouldTransact);
 		}
@@ -1288,11 +1373,8 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 
 
 		FLegacyMorphemeAnimChannelSetInfoQSA* ChannelSetsInfo = AnimSourceDataTypeQSA->ChannelSetsInfo;
-		FLegacyMorphemeAnimRigToAnimMap* RigToAnimMap = reinterpret_cast<FLegacyMorphemeAnimRigToAnimMap*>(MorphemeAnimSet->CompiledRigToAnimMapDataPC64.BulkData+48);
-		RigToAnimMap->Unpack();
-
-		FLegacyMorphemeAnimRigDef* RigDef = reinterpret_cast<FLegacyMorphemeAnimRigDef*>(MorphemeAnimSet->CompiledRigDataPC64.BulkData+48);
-		RigDef->Unpack();
+		FLegacyMorphemeAnimRigToAnimMap* RigToAnimMap = MorphemeAnimSet->GetAnimRigToAnimMap();
+		FLegacyMorphemeAnimRigDef* RigDef =  MorphemeAnimSet->GetAnimRigDef();
 		
 		if (!ensure(ChannelSetsInfo->SplinePositionNumChannels == 0))
 		{
@@ -1306,6 +1388,47 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 		FLegacyMorphemeAnimSectionQSA* LastLegactMorphemeAnimSection = AnimSourceDataTypeQSA->Sections[AnimSourceDataTypeQSA->NumSections-1];
 		NumFrames = LastLegactMorphemeAnimSection->SectionAnimStartFrame + LastLegactMorphemeAnimSection->SectionNumAnimFrames;
 		SequenceLength = AnimSourceDataTypeQSA->Duration;
+
+		TArray<FVector3f> RootPositions;
+		TArray<FQuat4f> RootRotations;
+		FLegacyMorphemeTrajectorySourceQSA* TrajectoryData = AnimSourceDataTypeQSA->TrajectoryData;
+		for (int32 Key = 0; Key < TrajectoryData->m_numAnimFrames; Key++)
+		{
+			FVector3f&KeyPosition = RootPositions.AddDefaulted_GetRef();
+			if (TrajectoryData->m_flags&0x1)
+			{
+				KeyPosition.X = static_cast<float>((TrajectoryData->m_sampledDeltaPosKeys[ Key].Data >> 21) & 0x7FF);  // 11 bits
+				KeyPosition.Y = static_cast<float>((TrajectoryData->m_sampledDeltaPosKeys[Key].Data >> 10) & 0x7FF);  // 11 bits
+				KeyPosition.Z = static_cast<float>(TrajectoryData->m_sampledDeltaPosKeys[Key].Data & 0x3FF);   // 10 bits
+				KeyPosition *= TrajectoryData->m_sampledDeltaPosKeysInfo.Min;
+				KeyPosition += TrajectoryData->m_sampledDeltaPosKeysInfo.Max;
+			}
+			else
+			{
+				KeyPosition = TrajectoryData->m_sampledDeltaPosKeysInfo.Min;
+			}
+
+			
+			if (TrajectoryData->m_flags&(0x1<<8))
+			{
+				FVector3f KeyRotation;
+				KeyRotation.X = static_cast<float>(TrajectoryData->m_sampledDeltaQuatKeys[ Key].X);  // 11 bits
+				KeyRotation.Y = static_cast<float>(TrajectoryData->m_sampledDeltaQuatKeys[ Key].Y);  // 11 bits
+				KeyRotation.Z = static_cast<float>(TrajectoryData->m_sampledDeltaQuatKeys[ Key].Z);   // 10 bits
+				KeyRotation *= TrajectoryData->m_sampledDeltaQuatKeysInfo.Min;
+				KeyRotation += TrajectoryData->m_sampledDeltaQuatKeysInfo.Max;
+				RootRotations.Add(VectorToQuat(KeyRotation));
+			}
+			else
+			{
+				FQuat4f&KeyRotation = RootRotations.AddDefaulted_GetRef();
+				KeyRotation.X = TrajectoryData->m_sampledDeltaQuatKeysInfo.Min.X;
+				KeyRotation.Y = TrajectoryData->m_sampledDeltaQuatKeysInfo.Min.Y;
+				KeyRotation.Z = TrajectoryData->m_sampledDeltaQuatKeysInfo.Min.Z;
+				KeyRotation.W = TrajectoryData->m_sampledDeltaQuatKeysInfo.Max.X;
+			}
+		}
+
 		
 		TArray<TArray<FVector3f>>  KeyPositions;
 		TArray<TArray<FQuat4f>>  KeyRotations;
@@ -1459,7 +1582,7 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 				}
 			}
 		}
-		
+		FName RootBoneName = Skeleton->GetReferenceSkeleton().GetBoneName(0);
 		for (int32 RigIndex = 1; RigIndex <KeyPositions.Num(); RigIndex++)
 		{
 			check(KeyPositions[RigIndex].Num() == KeyRotations[RigIndex].Num())
@@ -1467,7 +1590,7 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 			{
 				continue;
 			}
-
+			
 			FName BoneName = OwnerAnimSet->TrackBoneNames[RigIndex-1];
 			TArray<FVector> PosKeys;
 			TArray<FQuat> RotKeys;
@@ -1477,6 +1600,12 @@ void ULegacyMorphemeAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnim
 				FVector3f PosKey = KeyPositions[RigIndex][FrameIndex]*50.f;
 				FQuat4f RotKey = KeyRotations[RigIndex][FrameIndex];
 				FVector3f ScaleKey = {1, 1, 1};
+				if (RootBoneName == BoneName&&FrameIndex<TrajectoryData->m_numAnimFrames&&ensure(TrajectoryData->m_sampleFrequency == AnimSourceDataTypeQSA->SampleFrequency))
+				{
+					FTransform3f TrajectoryTransform = FTransform3f(RootRotations[FrameIndex],RootPositions[FrameIndex]*50);
+					PosKey = TrajectoryTransform.TransformPosition(PosKey);
+					RotKey = TrajectoryTransform.TransformRotation(RotKey);
+				}
 				PosKeys.Add(FVector(PosKey.X, PosKey.Y, PosKey.Z));
 				RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, RotKey.W));
 				ScaleKeys.Add(FVector(ScaleKey.X, ScaleKey.Y, ScaleKey.Z));
@@ -1519,3 +1648,4 @@ bool ULegacyMorphemeAnimSequence::CanImport()
 	return ensureMsgf(false,TEXT("MorphemeAnimSequence[%s] not support format %d"),*GetLegacyFullName(),AnimationFormat);
 	
 }
+

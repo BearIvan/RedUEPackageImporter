@@ -54,19 +54,47 @@ struct FLegacyMorphemeAnimRigToAnimMap
 };
 static_assert(sizeof(FLegacyMorphemeAnimRigToAnimMap) == 0x30);
 
+struct FLegacyMorphemeHierarchy
+{
+	int32	NumEntries;
+	int32*	HierarchyArray;
+	void	Unpack();
+};
+
+static_assert(sizeof(FLegacyMorphemeHierarchy) == 0x10);
+
+struct FLegacyMorphemeAnimRigDef
+{
+	FQuat4f						BlendFrameOrientation;
+	FVector3f					BlendFrameTranslation;
+	FLegacyMorphemeHierarchy*	Hierarchy;
+	int32						TrajectoryBoneIndex;
+	int32						CharacterRootBoneIndex;
+	void*						BoneNameMap;
+	void*						BindPose;
+	void						Unpack();
+};
+
+static_assert(sizeof(FLegacyMorphemeAnimRigDef) == 0x40);
+
 UCLASS()
 class REDUELEGACY_API ULegacyMorphemeAnimSet: public ULegacyAnimSet
 {
 	GENERATED_BODY()
 public:
-	virtual void 						LegacySerialize	(FRedUELegacyArchive& Ar) override;
-			FRedUELegacyByteBulkData 	CompiledRigDataPC32;
-			FRedUELegacyByteBulkData 	CompiledRigDataPC64;
-			FRedUELegacyByteBulkData 	CompiledRigDataX360;
-			FRedUELegacyByteBulkData 	CompiledRigDataPS3;
-			FRedUELegacyByteBulkData 	CompiledRigToAnimMapDataPC32;
-			FRedUELegacyByteBulkData 	CompiledRigToAnimMapDataPC64;
-			FRedUELegacyByteBulkData 	CompiledRigToAnimMapDataX360;
-			FRedUELegacyByteBulkData 	CompiledRigToAnimMapDataPS3;
+	virtual void 									LegacySerialize		(FRedUELegacyArchive& Ar) override;
+			FLegacyMorphemeAnimRigToAnimMap*		GetAnimRigToAnimMap ();
+			FLegacyMorphemeAnimRigDef*				GetAnimRigDef		();
+	
+			FRedUELegacyByteBulkData 				CompiledRigDataPC32;
+			FRedUELegacyByteBulkData 				CompiledRigDataPC64;
+			FRedUELegacyByteBulkData 				CompiledRigDataX360;
+			FRedUELegacyByteBulkData 				CompiledRigDataPS3;
+			FRedUELegacyByteBulkData 				CompiledRigToAnimMapDataPC32;
+			FRedUELegacyByteBulkData 				CompiledRigToAnimMapDataPC64;
+			FRedUELegacyByteBulkData 				CompiledRigToAnimMapDataX360;
+			FRedUELegacyByteBulkData 				CompiledRigToAnimMapDataPS3;
+			FLegacyMorphemeAnimRigToAnimMap*		CurrentAnimRigToAnimMap = nullptr;
+			FLegacyMorphemeAnimRigDef*				CurrentAnimRigDef = nullptr;
 };
 	

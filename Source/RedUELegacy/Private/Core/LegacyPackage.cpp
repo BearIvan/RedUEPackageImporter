@@ -821,7 +821,6 @@ ULegacyObject* ULegacyPackage::GetOrCreateExport(int32 Index)
     		{
     			Template = GetOrCreateExport(Exp.Archetype-1);
     		}
-    		ensure(Template);
     		RedUELegacySubsystem->ObjectPreload(Template);
     	}
     	if (Template)

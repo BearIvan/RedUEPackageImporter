@@ -100,6 +100,25 @@ void ULegacyMaterialInstance::LegacySerialize(FRedUELegacyArchive& Ar)
 			Ar << StaticParameters.BaseMaterialId << StaticParameters.StaticSwitchParameters << StaticParameters.StaticComponentMaskParameters;
 		}
 	}
+	else if (Ar.Game == ERedUELegacyGame::Bioshock3)
+	{
+		FGuid Guid;
+		Ar<<Guid;
+		for (int32 k = 0; k < 5; ++k )
+		{
+			TArray<ULegacyObject*> PlatformUniformExpressionTextures;
+			Ar<<PlatformUniformExpressionTextures;
+			for (ULegacyObject*Texture:PlatformUniformExpressionTextures)
+			{
+				if (Texture)
+				{
+					ReferencedTextures.Add(Texture);
+				}
+			}
+		}
+		
+		Ar << StaticParameters.BaseMaterialId << StaticParameters.StaticSwitchParameters << StaticParameters.StaticComponentMaskParameters;
+	}
 	Ar.Seek(Ar.GetStopper());
 }
 

@@ -7,6 +7,23 @@
 void ULegacyMaterial3::LegacySerialize(FRedUELegacyArchive& Ar)
 {
 	Super::LegacySerialize(Ar);
+	if (Ar.Game == ERedUELegacyGame::Bioshock3)
+	{
+		FGuid Guid;
+		Ar<<Guid;
+		for (int32 k = 0; k < 5; ++k )
+		{
+			TArray<ULegacyObject*> PlatformUniformExpressionTextures;
+			Ar<<PlatformUniformExpressionTextures;
+			for (ULegacyObject*Texture:PlatformUniformExpressionTextures)
+			{
+				if (Texture)
+				{
+					ReferencedTextures.Add(Texture);
+				}
+			}
+		}
+	}
 	Ar.Seek(Ar.GetStopper());
 }
 
@@ -94,10 +111,10 @@ UObject* ULegacyMaterial3::ExportToContent()
 			Material->SetShadingModel(MSM_DefaultLit);
 			break;
 		case ELegacyMaterialLightingModel::MLM_Unlit:
+		case ELegacyMaterialLightingModel::MLM_Custom:
 			Material->SetShadingModel(MSM_Unlit);
 			break;
 		case ELegacyMaterialLightingModel::MLM_SHPRT:
-		case ELegacyMaterialLightingModel::MLM_Custom:
 		case ELegacyMaterialLightingModel::MLM_Anisotropic:
 		default:
 			ensureMsgf(false,TEXT("Unkown Shading Mode"));

@@ -57,4 +57,7 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	FName TextureFileCacheName;
+
+	UPROPERTY(BlueprintReadWrite)
+	TEnumAsByte<TextureGroup> LODGroup;
 };

@@ -8,8 +8,10 @@
 #include "RedUELegacyGame.h"
 #include "RedUELegacySubsystem.generated.h"
 
+class ULegacyXWorldFloatingSectionIndexTable;
 class ULegacyPackage;
 class ULegacyObject;
+class ULegacyWorld;
 /**
  * 
  */
@@ -20,7 +22,7 @@ class REDUELEGACY_API URedUELegacySubsystem : public UEditorSubsystem
 
 public:
                     URedUELegacySubsystem   ();
-    void            ObjectPreload			 (ULegacyObject* Object);
+    void            ObjectPreload			(ULegacyObject* Object);
     void            ObjectsBeginLoad        ();
     void            ObjectsEndLoad          ();
     void            RefreshClasses          (ERedUELegacyEngineType CurrentEngineType, ERedUELegacyGameType CurrentGameType);
@@ -30,6 +32,9 @@ public:
     int32           ObjectsBeginLoadCount = 0;
 
 	UFUNCTION(BlueprintCallable)
+	void ImportWorld(FName PackageName,TSet<FName> AllowLevels, TSet<FName> DenyLevels, bool AllowAlwaysLoadingLevel,bool ImportPersistentLevel = true,bool ReimportKismet = false);
+	
+	UFUNCTION(BlueprintCallable)
 	ULegacyPackage*	GetPackage(const FString&Name);
     
 	UFUNCTION(BlueprintCallable)
@@ -37,6 +42,9 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	void ToCacheSkeletons();
+
+	UPROPERTY(Transient)
+	ULegacyWorld* GLegacyWorld = nullptr;
 	
     UPROPERTY(Transient)
     TMap<FString,ULegacyPackage*> Packages;
@@ -44,7 +52,6 @@ public:
     UPROPERTY(Transient)
     TArray<ULegacyObject*> ObjectsLoaded;
 	
-
     UPROPERTY(Transient)
     TMap<FName,TSubclassOf<ULegacyObject>> Classes;
 	
@@ -65,7 +72,9 @@ public:
 	
 	UPROPERTY(Transient)
 	TArray<USkeleton*> Skeletons;
-	
+
+	UPROPERTY(Transient)
+	ULegacyXWorldFloatingSectionIndexTable* FloatingSectionIndexTable = nullptr;
 	
     ERedUELegacyGameType CurrentGameType = ERedUELegacyGameType::Unkown;
     ERedUELegacyEngineType CurrentEngineType = ERedUELegacyEngineType::Unkown;

@@ -3,12 +3,16 @@
 
 #include "Core/RedUELegacySubsystem.h"
 
+#include "Editor.h"
+#include "EditorLevelUtils.h"
+#include "LevelUtils.h"
 #include "PackageTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/LegacyObject.h"
 #include "Core/LegacyPackage.h"
 #include "Kismet/Base/SequenceAction.h"
 #include "Material/SingularityTextureFileCache.h"
+#include "World/LegacyWorld.h"
 #include "World/Sequences/Object/LegacySequenceObjects.h"
 DEFINE_LOG_CATEGORY(LogRedUELegacy);
 
@@ -169,6 +173,36 @@ bool URedUELegacySubsystem::IsKnownClass(FName ClassName)
     return Class != nullptr || SequenceActionClasses.Contains(ClassName);
 }
 
+void URedUELegacySubsystem::ImportWorld(FName PackageName, TSet<FName> AllowLevels, TSet<FName> DenyLevels, bool AllowAlwaysLoadingLevel,bool ImportPersistentLevel, bool ReimportKismet)
+{
+
+    if (ULegacyPackage *Package = GetPackage(PackageName.ToString()))
+    {
+        if (CurrentGameType == ERedUELegacyGameType::Bioshock3)
+        {
+            FloatingSectionIndexTable =  nullptr;
+            if (ULegacyPackage *FloatingSectionPackage = GetPackage(PackageName.ToString() + TEXT("_FWIT_SF")))
+            {
+                int32 XWorldFloatingSectionIndexTableIndex = FloatingSectionPackage->FindExport("XWorldFloatingSectionIndexTable");
+                if(XWorldFloatingSectionIndexTableIndex!=INDEX_NONE)
+                {
+                    FloatingSectionIndexTable = Cast<ULegacyXWorldFloatingSectionIndexTable>( FloatingSectionPackage->GetOrCreateExport(XWorldFloatingSectionIndexTableIndex));
+                }
+            }
+        }
+        
+        int32 TheWorldIndex = Package->FindExport(NAME_TheWorld);
+        if(TheWorldIndex!=INDEX_NONE)
+        {
+            if(ULegacyWorld* LegacyWorld = Cast<ULegacyWorld>( Package->GetOrCreateExport(TheWorldIndex)))
+            {
+                GLegacyWorld = LegacyWorld;
+                LegacyWorld->ImportWorld(AllowLevels,DenyLevels,AllowAlwaysLoadingLevel,ImportPersistentLevel,ReimportKismet);
+            }
+        }
+    }
+}
+
 ULegacyPackage* URedUELegacySubsystem::GetPackage(const FString& FileName)
 {
     if(ULegacyPackage**Package =  Packages.Find(FileName))
@@ -213,6 +247,8 @@ void URedUELegacySubsystem::Clear()
     Skeletons.Empty();
     CurrentEngineType = ERedUELegacyEngineType::Unkown;
     CurrentGameType = ERedUELegacyGameType::Unkown;
+    FloatingSectionIndexTable = nullptr;
+    GLegacyWorld = nullptr;
     CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
 }
 

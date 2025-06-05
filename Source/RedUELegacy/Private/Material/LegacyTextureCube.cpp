@@ -72,12 +72,12 @@ UObject* ULegacyTextureCube::ExportToContent()
 	    {
 	    	RedImageTool::RedImage Image;
 	    	FaceNegY->ExportTo(Image,&IsHDR);
-	    	FinalImage.Append(0,0,Image,2,0);
+	    	FinalImage.Append(0,0,Image,3,0);
 	    }
 	    {
 	    	RedImageTool::RedImage Image;
 	    	FacePosY->ExportTo(Image,&IsHDR);
-	    	FinalImage.Append(0,0,Image,3,0);
+	    	FinalImage.Append(0,0,Image,2,0);
 	    }
 	    {
 	    	RedImageTool::RedImage Image;

@@ -16,6 +16,8 @@ struct FLegacyRotator
 	INT Roll;  // Rotation about axis of screen, 0=Straight, +Clockwise, -CCW.
 };
 
+
+
 inline FArchive& operator<<(FArchive& Ar, FLegacyRotator& R)
 {
 	R.Serialize(Ar);
@@ -30,6 +32,38 @@ struct TStructOpsTypeTraits<FLegacyRotator> : public TStructOpsTypeTraitsBase2<F
 		WithSerializer = true
 	};
 };
+
+
+USTRUCT(Blueprintable)
+struct FLegacyMatrix
+{
+	GENERATED_BODY()
+
+	bool Serialize(FArchive& Ar);
+	operator FMatrix44f();
+	operator FMatrix();
+	FLegacyMatrix&operator=(const FMatrix44f& InData);
+	FMatrix44f Data;
+};
+
+
+
+inline FArchive& operator<<(FArchive& Ar, FLegacyMatrix& R)
+{
+	R.Serialize(Ar);
+	return Ar;
+}
+
+template <>
+struct TStructOpsTypeTraits<FLegacyMatrix> : public TStructOpsTypeTraitsBase2<FLegacyMatrix>
+{
+	enum
+	{
+		WithSerializer = true
+	};
+};
+
+
 
 
 class ULegacyPackage;
