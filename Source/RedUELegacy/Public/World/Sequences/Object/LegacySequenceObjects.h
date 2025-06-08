@@ -446,22 +446,58 @@ public:
 };
 
 USTRUCT(BlueprintType)
-struct FLegacyToggleTrackKey
+struct FLegacyEventTrackKey
 {
 	GENERATED_BODY()
+public:
 	UPROPERTY(BlueprintReadWrite)
-	float Time = 0;
+	float Time;
+	
 	UPROPERTY(BlueprintReadWrite)
-	bool ToggleAction = false;
+	FName EventName;
 };
 
 UCLASS()
-class REDUELEGACY_API  ULegacyInterpTrackToggle: public ULegacyInterpTrack
+class REDUELEGACY_API  ULegacyInterpTrackEvent: public ULegacyInterpTrack
 {
+	GENERATED_BODY()
+public:
+	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
 	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FLegacyEventTrackKey> EventTrack;
+};
+
+UENUM()
+enum class EVisibilityTrackAction
+{
+	EVTA_Hide,
+	EVTA_Show,
+	EVTA_Toggle
+};
+
+USTRUCT(BlueprintType)
+struct FLegacyVisibilityTrackKey
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	float Time = 0;
+	
+	UPROPERTY(BlueprintReadWrite)
+	EVisibilityTrackAction Action = EVisibilityTrackAction::EVTA_Hide;
+};
+
+UCLASS()
+class REDUELEGACY_API  ULegacyInterpTrackVisibility: public ULegacyInterpTrack
+{
 public:
 	GENERATED_BODY()
-	TArray<FLegacyToggleTrackKey> ToggleTrack;
+	
+	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FLegacyVisibilityTrackKey> VisibilityTrack;
 };
 
 
@@ -592,6 +628,14 @@ class REDUELEGACY_API ULegacyInterpData : public ULegacySequenceVariable
 {
 	GENERATED_BODY()
 public:
+	
+	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						Fill					(ALegacyKismet* Kismet) override;
+			ULevelSequence*				GetOrCreateLevel		();
+			void						ExportToLevelSequence	(ULegacySeqAct_Interp* OwnerSeqAction ,ULevelSequence* LevelSequence);
+			FGuid						FindOrCreateBinding		(AActor& ActorToBind,const FString&NameBinding);
+			FGuid						FindOrCreateBinding		(USceneComponent& ComponentToBind,const FString&NameBinding);
+	
 	UPROPERTY(BlueprintReadWrite)
 	float InterpLength;
 
@@ -601,11 +645,9 @@ public:
 	UPROPERTY(Transient)
 	ULegacySeqAct_Interp* OwnerSeqAct_Interp = nullptr;
 
-	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
-	virtual void						Fill					(ALegacyKismet* Kismet) override;
-			ULevelSequence*				GetOrCreateLevel		();
-			void						ExportToLevelSequence	(ULegacySeqAct_Interp* OwnerSeqAction ,ULevelSequence* LevelSequence);
-			FGuid						FindOrCreateBinding		(USceneComponent& ComponentToBind,const FString&NameBinding);
+	UPROPERTY(Transient)
+	ALegacyKismet* CurrentKismet;
+	
 private:
 	
 	UPROPERTY(Transient)
@@ -613,4 +655,5 @@ private:
 
 	UPROPERTY(Transient)
 	TMap<USceneComponent*,FGuid> BindingMap;
+	
 };

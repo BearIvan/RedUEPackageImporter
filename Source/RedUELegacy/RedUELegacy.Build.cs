@@ -62,7 +62,7 @@ public class RedUELegacy : ModuleRules
                 "LevelSequence", 
                 "MovieScene", 
                 "Sequencer",
-                "MovieSceneTracks", 
+                "MovieSceneTracks", "MovieSceneTools", 
                 // ... add private dependencies that you statically link with here ...	
 			}
 			);

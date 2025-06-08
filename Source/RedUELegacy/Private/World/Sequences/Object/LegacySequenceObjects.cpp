@@ -14,6 +14,7 @@
 #include "K2Node_VariableGet.h"
 #include "LevelSequence.h"
 #include "MovieScene.h"
+#include "MovieSceneEventUtils.h"
 #include "ObjectTools.h"
 #include "PackageTools.h"
 #include "SequencerUtilities.h"
@@ -31,8 +32,12 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Mesh/LegacyAnimSequence.h"
 #include "Mesh/LegacyAnimSet.h"
+#include "Sections/MovieSceneEventTriggerSection.h"
+#include "Sections/MovieSceneVisibilitySection.h"
 #include "Tracks/MovieScene3DTransformTrack.h"
+#include "Tracks/MovieSceneEventTrack.h"
 #include "Tracks/MovieSceneSkeletalAnimationTrack.h"
+#include "Tracks/MovieSceneVisibilityTrack.h"
 #include "World/LegacyWorld.h"
 #include "World/Actors/LegacyActor.h"
 #include "World/Sequences/LegacySequence.h"
@@ -544,6 +549,172 @@ void ULegacyInterpTrack::ExportToLevelSequence( const TSharedRef<ISequencer>&Seq
 {
 }
 
+void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
+{
+	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
+	if (!Actor)
+	{
+		return;
+	}
+	
+	ULegacyInterpGroup* InterpGroup = GetTypedOuter<ULegacyInterpGroup>();
+	if (!ensure(InterpGroup))
+	{
+		return;
+	}
+	
+	ULegacyInterpData* InterpData = GetTypedOuter<ULegacyInterpData>();
+	if (!ensure(InterpData))
+	{
+		return;
+	}
+	
+	
+	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*InterpData->CurrentKismet,InterpGroup->GroupName.ToString());
+	UMovieSceneEventTrack* Track = Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->AddTrack<UMovieSceneEventTrack>(ObjectGuid);
+	UMovieSceneEventTriggerSection* Section = CastChecked<UMovieSceneEventTriggerSection>(Track->CreateNewSection());
+	Track->AddSection(*Section);
+	
+	FMovieSceneSequenceEditor* SequenceEditor = FMovieSceneSequenceEditor::Find(Sequencer->GetRootMovieSceneSequence());
+	if (!ensure(SequenceEditor))
+	{
+		return;
+	}
+	
+	UBlueprint* SequenceDirectorBP = SequenceEditor->GetOrCreateDirectorBlueprint(Sequencer->GetRootMovieSceneSequence());
+	if (!ensure(SequenceDirectorBP))
+	{
+		
+		return;
+	}
+
+	TMovieSceneChannelData<FMovieSceneEvent> ChannelData = Section->EventChannel.GetData();
+	ChannelData.Reset();
+	for (const FLegacyEventTrackKey& Key :EventTrack)
+	{
+		FMovieSceneEvent NewKey;
+
+		{
+			Section->Modify();
+			SequenceDirectorBP->Modify();
+
+			// Ensure the section is bound to the blueprint function generation event
+			FMovieSceneEventUtils::BindEventSectionToBlueprint(Section, SequenceDirectorBP);
+
+			// Create the new user-facing event node
+			FMovieSceneDirectorBlueprintEndpointDefinition EndpointDefinition = FMovieSceneEventUtils::GenerateEventDefinition(Track);
+			EndpointDefinition.EndpointName = Key.EventName.ToString();
+
+			if (UK2Node_CustomEvent* NewEventNode = FMovieSceneDirectorBlueprintUtils::CreateEventEndpoint(SequenceDirectorBP, EndpointDefinition))
+			{
+				// Bind the node to the event entry point
+				UEdGraphPin* BoundObjectPin = FMovieSceneDirectorBlueprintUtils::FindCallTargetPin(NewEventNode, EndpointDefinition.PossibleCallTargetClass);
+				FMovieSceneEventUtils::SetEndpoint(&NewKey, Section, NewEventNode, BoundObjectPin);
+
+				{
+					FGraphNodeCreator<UK2Node_CallFunction> NodeCreator(*NewEventNode->GetGraph());
+					UK2Node_CallFunction* NextLogicStateNode = NodeCreator.CreateNode();
+					NextLogicStateNode->SetFromFunction(ALegacyKismet::StaticClass()->FindFunctionByName(""));
+					NodeCreator.Finalize();
+					NextLogicStateNode->NodePosX = NewEventNode->NodePosX + 450;
+					NextLogicStateNode->NodePosY = NewEventNode->NodePosY;
+					NewEventNode->GetThenPin()->MakeLinkTo(NextLogicStateNode->GetExecPin());
+					
+					UEdGraphPin* OutputPin = NextLogicStateNode->FindPin(UEdGraphSchema_K2::PN_ReturnValue, EGPD_Input);
+					UEdGraphPin* NewNodeReturnValuePin = NewEventNode->FindPin(UEdGraphSchema_K2::PN_ReturnValue, EGPD_Output);
+					if (OutputPin && NewNodeReturnValuePin)
+					{
+						NewNodeReturnValuePin->MakeLinkTo(OutputPin);
+					}
+
+					
+				}
+				//NewEventNode->GetGraph();
+				
+				
+			}
+		}
+		ChannelData.AddKey(Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time),NewKey);
+	}
+	
+}
+
+void ULegacyInterpTrackVisibility::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
+{
+	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
+	if (!Actor)
+	{
+		return;
+	}
+	ULegacyInterpGroup* InterpGroup = GetTypedOuter<ULegacyInterpGroup>();
+	if (!ensure(InterpGroup))
+	{
+		return;
+	}
+	
+	ULegacyInterpData* InterpData = GetTypedOuter<ULegacyInterpData>();
+	if (!ensure(InterpData))
+	{
+		return;
+	}
+	
+	
+	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*Actor,InterpGroup->GroupName.ToString());
+	UMovieSceneVisibilityTrack* Track = Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->AddTrack<UMovieSceneVisibilityTrack>(ObjectGuid);
+	FName PropertyName =  AActor::GetHiddenPropertyName();
+	Track->SetPropertyNameAndPath( PropertyName, PropertyName.ToString());
+	
+	bool bSectionAdded = false;
+	UMovieSceneVisibilitySection* Section = CastChecked<UMovieSceneVisibilitySection>(Track->FindOrAddSection(0, bSectionAdded));
+	Section->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
+	
+	TMovieSceneChannelData<bool> Data = Section->GetChannel().GetData();
+	Data.Reset();
+	bool LastState = !Actor->IsHidden();
+
+	if (VisibilityTrack.Num() > 0 && !FMath::IsNearlyZero(VisibilityTrack[0].Time) )
+	{
+		if (VisibilityTrack[0].Action == EVisibilityTrackAction::EVTA_Toggle)
+		{
+			VisibilityTrack.Insert({0,LastState? EVisibilityTrackAction::EVTA_Hide:EVisibilityTrackAction::EVTA_Show},0);
+		}
+		else if (VisibilityTrack[0].Action == EVisibilityTrackAction::EVTA_Show && !LastState)
+		{
+			VisibilityTrack.Insert({0,EVisibilityTrackAction::EVTA_Hide},0);
+		}
+		else if (VisibilityTrack[0].Action == EVisibilityTrackAction::EVTA_Hide && LastState)
+		{
+			VisibilityTrack.Insert({0,EVisibilityTrackAction::EVTA_Show},0);
+		}
+	}
+	
+	for (const FLegacyVisibilityTrackKey& Key :VisibilityTrack)
+	{
+		switch (Key.Action)
+		{
+		case EVisibilityTrackAction::EVTA_Hide:
+			Data.AddKey(Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time),false);
+			LastState = false;
+			break;
+		case EVisibilityTrackAction::EVTA_Show:
+			Data.AddKey(Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time),true);
+			LastState = true;
+			break;
+		case EVisibilityTrackAction::EVTA_Toggle:
+			LastState = !LastState;
+			Data.AddKey(Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time),LastState);
+			break;
+		default: ;
+		}
+	}
+	
+	Section->SetRange(TRange<FFrameNumber>::All());
+	
+
+	
+	Super::ExportToLevelSequence(Sequencer, LegacyAction);
+}
+
 void ULegacyInterpTrackAnimControl::ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer, ULegacyActor* LegacyAction)
 {
 	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
@@ -551,6 +722,8 @@ void ULegacyInterpTrackAnimControl::ExportToLevelSequence(const TSharedRef<ISequ
 	{
 		return;
 	}
+
+	
 	USkeletalMeshComponent* SkeletalMeshComponent = Actor->FindComponentByClass<USkeletalMeshComponent>();
 	if (!SkeletalMeshComponent)
 	{
@@ -862,6 +1035,7 @@ FBPVariableDescription* ULegacyInterpData::GetOrCreateVariable(UBlueprint* InBlu
 
 void ULegacyInterpData::Fill(ALegacyKismet* Kismet)
 {
+	CurrentKismet = Kismet;
 	if(VarName == NAME_None)
 	{
 		VarName = GetLegacyFName();
@@ -872,6 +1046,7 @@ void ULegacyInterpData::Fill(ALegacyKismet* Kismet)
 		LevelSequenceActor->SetSequence(GetOrCreateLevel());
 		Property->SetValue_InContainer(Kismet,&LevelSequenceActor);
 	}
+	CurrentKismet = nullptr;
 }
 
 ULevelSequence* ULegacyInterpData::GetOrCreateLevel()
@@ -990,6 +1165,35 @@ void ULegacyInterpData::ExportToLevelSequence(ULegacySeqAct_Interp* OwnerSeqActi
 			InterpGroup->ExportToLevelSequence(OwnerSeqAction, Sequencer);
 		}
 	}
+}
+
+FGuid ULegacyInterpData::FindOrCreateBinding(AActor& ActorToBind, const FString& NameBinding)
+{
+	UMovieScene* MovieScene = LevelSequence->GetMovieScene();
+	if (!MovieScene)
+	{
+		return {};
+	}
+
+
+	FGuid ActorBinding = LevelSequence->FindBindingFromObject(&ActorToBind, ActorToBind.GetWorld());
+	if (!ActorBinding.IsValid())
+	{
+		// We use the label here because that will always be named after the prim that caused the actor
+		// to be generated. If we just used our own PrimName in here we may run into situations where a child Camera prim
+		// of a decomposed camera ends up naming the actor binding after itself, even though the parent Xform prim, and the
+		// actor on the level, maybe named something else
+		ActorBinding = MovieScene->AddPossessable(
+#if WITH_EDITOR
+			NameBinding,
+#else
+			NameBinding,
+#endif	  // WITH_EDITOR
+			ActorToBind.GetClass()
+		);
+		LevelSequence->BindPossessableObject(ActorBinding, ActorToBind, ActorToBind.GetWorld());
+	}
+	return ActorBinding;
 }
 
 FGuid ULegacyInterpData::FindOrCreateBinding(USceneComponent& ComponentToBind, const FString& NameBinding)
