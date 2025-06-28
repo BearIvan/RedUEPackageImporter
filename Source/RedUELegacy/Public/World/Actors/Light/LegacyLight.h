@@ -30,3 +30,19 @@ class REDUELEGACY_API ULegacySpotLightToggleable : public ULegacySpotLight
 {
 	GENERATED_BODY()
 };
+
+UCLASS()
+class REDUELEGACY_API ULegacyPointLight : public ULegacyLight
+{
+	GENERATED_BODY()
+public:
+	virtual UClass* GetActorClass_Implementation	() override;
+};
+
+
+UCLASS()
+class REDUELEGACY_API ULegacyPointLightToggleable : public ULegacyPointLight
+{
+	GENERATED_BODY()
+};
+

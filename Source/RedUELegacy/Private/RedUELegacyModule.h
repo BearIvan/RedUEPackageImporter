@@ -6,4 +6,7 @@ public:
 
     void StartupModule() override;
     void ShutdownModule() override;
+private:
+    
+    FDelegateHandle HybridMaterialTrackEditorHandle;
 };

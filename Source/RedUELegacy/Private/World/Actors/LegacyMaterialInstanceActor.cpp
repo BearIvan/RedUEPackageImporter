@@ -1,16 +1,17 @@
 ﻿#include "World/Actors/LegacyMaterialInstanceActor.h"
 
-#include "Actors/MaterialInstanceActor/RedMaterialInstanceActor.h"
+#include "Actors/MaterialInstanceActor/MaterialInstanceHybridActor.h"
 #include "Material/LegacyMaterialInstance.h"
+#include "Materials/Hybrid/MaterialInstanceHybrid.h"
 
 void ULegacyMaterialInstanceActor::FillActor_Implementation(AActor* InActor)
 {
 	Super::FillActor_Implementation(InActor);
-	ARedMaterialInstanceActor* RedMaterialInstance = CastChecked<ARedMaterialInstanceActor>(InActor);
-	RedMaterialInstance->MaterialInstance = Cast<UMaterialInstanceConstant>(MatInst->ExportToContent());
+	AMaterialInstanceHybridActor* RedMaterialInstance = CastChecked<AMaterialInstanceHybridActor>(InActor);
+	RedMaterialInstance->MaterialInstance = Cast<UMaterialInstanceHybrid>(MatInst->ExportToContent());
 }
 
 UClass* ULegacyMaterialInstanceActor::GetActorClass_Implementation()
 {
-	return ARedMaterialInstanceActor::StaticClass();
+	return AMaterialInstanceHybridActor::StaticClass();
 }

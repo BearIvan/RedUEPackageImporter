@@ -12,3 +12,8 @@ UClass* ULegacySpotLight::GetActorClass_Implementation()
 {
 	return ASpotLight::StaticClass();
 }
+
+UClass* ULegacyPointLight::GetActorClass_Implementation()
+{
+	return APointLight::StaticClass();
+}

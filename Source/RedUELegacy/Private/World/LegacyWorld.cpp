@@ -135,7 +135,7 @@ void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, 
 			{
 				TArray<AActor*> Actors = GWorld->PersistentLevel->Actors;
 				Actors.Remove(nullptr);
-				GUnrealEd->DeleteActors(Actors, GWorld, GUnrealEd->GetSelectedActors()->GetElementSelectionSet());
+				GUnrealEd->DeleteActors(Actors, GWorld, GUnrealEd->GetSelectedActors()->GetElementSelectionSet(),false,false,false);
 			}
 		}
 		ImportLevel(ReimportKismet);

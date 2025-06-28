@@ -9,6 +9,9 @@ class REDUELEGACYGAME_API UXSeqAct_PlayScriptedSequence : public USequenceAction
 {
 	GENERATED_BODY()
 public:
+	
+	virtual void Tick(float DeltaTime) override;;
+	
 	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 0))
 	void Initiate();
 	
@@ -21,6 +24,11 @@ public:
 	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 1))
 	FSequenceActionDelegate SequenceCleanedUp;
 
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
+	TArray<AActor*> Targets;
+
+	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Targets);
+	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1))
 	AActor* StartPosition;
 	
@@ -34,7 +42,16 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 3))
 	AActor* HandsMeshTargets;
 	
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(AActor*,HandsMeshTargets);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(AActor*,HandsMeshTargets)
+
+	UPROPERTY(BlueprintReadWrite,EditAnywhere)
+	float MovePlayerDuration = 0.f;
+	
+	UPROPERTY(BlueprintReadWrite,EditAnywhere)
+	bool CleanupAfterBeingReady = false;
+private:
+	UPROPERTY()
+	float CurrentTime = 0.f;
 };
 
 UCLASS()

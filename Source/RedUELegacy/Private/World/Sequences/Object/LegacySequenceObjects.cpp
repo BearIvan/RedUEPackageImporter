@@ -18,6 +18,7 @@
 #include "ObjectTools.h"
 #include "PackageTools.h"
 #include "SequencerUtilities.h"
+#include "Actors/MaterialInstanceActor/MaterialInstanceHybridActor.h"
 #include "Animation/AnimSequence.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Blueprint/Kismet/K2Node_SequenceAction.h"
@@ -25,11 +26,15 @@
 #include "Core/LegacyPackage.h"
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacySubsystem.h"
+#include "Kismet/EngineSequenceActions.h"
 #include "Kismet/Base/LegacyKismet.h"
 #include "Kismet/Base/SequenceAction.h"
 #include "Kismet/Gameplay/SeqAct_Interp.h"
 #include "Kismet/Gameplay/XSeqAct_InstancePattern.h"
 #include "Kismet2/BlueprintEditorUtils.h"
+#include "Materials/Hybrid/MaterialInstanceHybrid.h"
+#include "Materials/Hybrid/MovieSceneHybridMaterialParameterSection.h"
+#include "Materials/Hybrid/MovieSceneHybridMaterialTrack.h"
 #include "Mesh/LegacyAnimSequence.h"
 #include "Mesh/LegacyAnimSet.h"
 #include "Sections/MovieSceneEventTriggerSection.h"
@@ -61,6 +66,15 @@ UEdGraphPin* ULegacySequenceOp::GetInputPin(int32 Index, UBlueprint* InBlueprint
 	}
 	return nullptr;
 	
+}
+
+UEdGraphPin* ULegacySequenceOp::GetEventPin(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	if (UK2Node_SequenceAction* Action = ExportToBlueprint(InBlueprint, InGraph))
+	{
+		return Action->GetEventOutput();
+	}
+	return nullptr;
 }
 
 void ULegacySequenceOp::SimulatedImport()
@@ -128,8 +142,34 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 	NewNode->Action = NewObject<USequenceAction>(NewNode,ToAction->GetClass(),NAME_None,RF_Transactional,ToAction);
 	NewNode->bCommentBubblePinned = true;
 	NewNode->OnUpdateCommentText(GetLegacyFullName());
+	
 	NodeCreator.Finalize();
 	CurrentNode = NewNode;
+
+	if (EventLinks.Num() > 0)
+	{
+		if (ensure(NewNode->InputEventsName != NAME_None))
+		{
+			ensure(EventLinks.Num() == 1);
+			for (ULegacySequenceOp* LinkEvent : EventLinks[0].LinkedEvents)
+			{
+				NewNode->AddEventPin();
+			}
+			TArray<UEdGraphPin*> Pins;
+			NewNode->GetEventPins(Pins);
+			for (ULegacySequenceOp* LinkEvent : EventLinks[0].LinkedEvents)
+			{
+				if (LinkEvent)
+				{
+					if (UEdGraphPin* Pin = LinkEvent->GetEventPin(InBlueprint,InGraph);ensure(Pin))
+					{
+						Pins[0]->MakeLinkTo(Pin);
+						Pins.RemoveAtSwap(0);
+					}
+				}
+			}
+		}
+	}
 	
 	for (int32  i = 0;i<OutputLinks.Num();i++)
 	{
@@ -161,23 +201,23 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 					{
 						if (ULegacySequenceVariable* Variable = CastChecked<ULegacySequenceVariable>(VariableLinks[i].LinkedVariables[LinkID],ECastCheckedType::NullAllowed))
 						{
-							if (FBPVariableDescription*VariableDescription = Variable->GetOrCreateVariable(InBlueprint,InGraph))
+							if (FName VariableDescription = Variable->GetOrCreateVariable(InBlueprint,InGraph);VariableDescription != NAME_None)
 							{
-								FProperty* BlueprintProperty = InBlueprint->SkeletonGeneratedClass->FindPropertyByName(VariableDescription->VarName);
+								FProperty* BlueprintProperty = InBlueprint->SkeletonGeneratedClass->FindPropertyByName(VariableDescription);
 								if (ensure(BlueprintProperty))
 								{
-									if (VariableLinks[i].LinkedVariables.Num() == 0 && BlueprintProperty->SameType(DstProperty) )
+									if (VariableLinks[i].LinkedVariables.Num() == 0 && PropertyAccessUtil::ArePropertiesCompatible(BlueprintProperty,DstProperty) )
 									{
 										FMemberReference&Reference = NewNode->Action->PropertiesReference.Add(*VariableName);
-										Reference.SetExternalMember(VariableDescription->VarName,InBlueprint->SkeletonGeneratedClass);
+										Reference.SetExternalMember(VariableDescription,InBlueprint->SkeletonGeneratedClass);
 									}
 									else
 									{
-										if (ensure(BlueprintProperty->SameType(DstProperty) || BlueprintProperty->SameType(DstArrayProperty->Inner)))
+										if (ensure(PropertyAccessUtil::ArePropertiesCompatible(BlueprintProperty,DstProperty) || PropertyAccessUtil::ArePropertiesCompatible(BlueprintProperty,DstArrayProperty->Inner)))
 										{
 											FScriptArrayHelper ArrayHelper(DstArrayProperty,DstArrayProperty->ContainerPtrToValuePtr<void>(NewNode->Action));
 											FSequenceActionPropertyArrayReference& PropertyArrayReference = NewNode->Action->PropertiesArrayReference.FindOrAdd(*VariableName);
-											PropertyArrayReference.ArrayElementReference.Add(ArrayHelper.Num()).SetExternalMember(VariableDescription->VarName,InBlueprint->SkeletonGeneratedClass);
+											PropertyArrayReference.ArrayElementReference.Add(ArrayHelper.Num()).SetExternalMember(VariableDescription,InBlueprint->SkeletonGeneratedClass);
 											ArrayHelper.AddValue();
 										}
 									}
@@ -190,15 +230,15 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 						ensure(VariableLinks[i].LinkedVariables.Num() == 1);
 						if (ULegacySequenceVariable* Variable = CastChecked<ULegacySequenceVariable>(VariableLinks[i].LinkedVariables[0],ECastCheckedType::NullAllowed))
 						{
-							if (FBPVariableDescription*VariableDescription = Variable->GetOrCreateVariable(InBlueprint,InGraph))
+							if (FName VariableDescription = Variable->GetOrCreateVariable(InBlueprint,InGraph);VariableDescription != NAME_None)
 							{
-								FProperty* BlueprintProperty = InBlueprint->SkeletonGeneratedClass->FindPropertyByName(VariableDescription->VarName);
+								FProperty* BlueprintProperty = InBlueprint->SkeletonGeneratedClass->FindPropertyByName(VariableDescription);
 								if (ensure(BlueprintProperty))
 								{
-									if (ensure(BlueprintProperty->SameType(DstProperty)))
+									if (ensure(PropertyAccessUtil::ArePropertiesCompatible(BlueprintProperty,DstProperty)))
 									{
 										FMemberReference&Reference = NewNode->Action->PropertiesReference.Add(*VariableName);
-										Reference.SetExternalMember(VariableDescription->VarName,InBlueprint->SkeletonGeneratedClass);
+										Reference.SetExternalMember(VariableDescription,InBlueprint->SkeletonGeneratedClass);
 									}
 								}
 							}
@@ -224,22 +264,9 @@ void ULegacySequenceImporter::PreLegacySerializeUnrealProps(FRedUELegacyArchive&
 }
 
 
-UK2Node* ULegacySequenceVariable::CreateGetNode(UBlueprint* InBlueprint, UEdGraph* InGraph)
+FName ULegacySequenceVariable::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
-	if(FBPVariableDescription* Variable = GetOrCreateVariable(InBlueprint, InGraph))
-	{
-		FGraphNodeCreator<UK2Node_VariableGet> NodeCreator(*InGraph);
-		UK2Node_VariableGet* VariableGet = NodeCreator.CreateNode();
-		VariableGet->VariableReference.SetSelfMember(Variable->VarName);
-		NodeCreator.Finalize();
-		return VariableGet;
-	}
-	return nullptr;
-}
-
-FBPVariableDescription* ULegacySequenceVariable::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
-{
-	return nullptr;
+	return NAME_None;
 }
 
 void ULegacySequenceVariable::Fill(ALegacyKismet* Kismet)
@@ -247,7 +274,7 @@ void ULegacySequenceVariable::Fill(ALegacyKismet* Kismet)
 }
 
 
-FBPVariableDescription* ULegacySeqVar_Object::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+FName ULegacySeqVar_Object::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	if(!VarGuid.IsValid())
 	{
@@ -269,10 +296,15 @@ FBPVariableDescription* ULegacySeqVar_Object::GetOrCreateVariable(UBlueprint* In
 		}
 		if(!VarGuid.IsValid())
 		{
-			return nullptr;
+			return NAME_None;
 		}
 	}
-	return InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
+	FBPVariableDescription* PointerPtr = InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
+	if(!PointerPtr)
+	{
+		return NAME_None;
+	}
+	return PointerPtr->VarName;
 }
 
 void ULegacySeqVar_Object::Fill(ALegacyKismet* Kismet)
@@ -296,7 +328,81 @@ void ULegacySeqVar_Object::Fill(ALegacyKismet* Kismet)
 	}
 }
 
-FBPVariableDescription* ULegacySeqVar_Named::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+FName ULegacySeqVar_Bool::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	if(!VarGuid.IsValid())
+	{
+		if(VarName == NAME_None)
+		{
+			VarName = GetLegacyFName();
+		}
+		{
+			FEdGraphPinType ObjectPinType(UEdGraphSchema_K2::PC_Boolean, NAME_None,nullptr, EPinContainerType::None, false, FEdGraphTerminalType());
+			if(ensure(FBlueprintEditorUtils::AddMemberVariable(InBlueprint, VarName, ObjectPinType,bValue?TEXT("true"):TEXT("false"))))
+			{
+				if(ensure(InBlueprint->NewVariables.Last().VarName == VarName))
+				{
+					InBlueprint->NewVariables.Last().PropertyFlags &= ~CPF_DisableEditOnInstance;
+					VarGuid = InBlueprint->NewVariables.Last().VarGuid;
+				}
+			}
+		}
+		if(!VarGuid.IsValid())
+		{
+			return NAME_None;
+		}
+	}
+	FBPVariableDescription* PointerPtr = InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
+	if(!PointerPtr)
+	{
+		return NAME_None;
+	}
+	return PointerPtr->VarName;
+}
+
+void ULegacySeqVar_Bool::Fill(ALegacyKismet* Kismet)
+{
+	Super::Fill(Kismet);
+}
+
+FName ULegacySeqVar_Int::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	if(!VarGuid.IsValid())
+	{
+		if(VarName == NAME_None)
+		{
+			VarName = GetLegacyFName();
+		}
+		{
+			FEdGraphPinType ObjectPinType(UEdGraphSchema_K2::PC_Int, NAME_None,nullptr, EPinContainerType::None, false, FEdGraphTerminalType());
+			if(ensure(FBlueprintEditorUtils::AddMemberVariable(InBlueprint, VarName, ObjectPinType,FString::FromInt(IntValue))))
+			{
+				if(ensure(InBlueprint->NewVariables.Last().VarName == VarName))
+				{
+					InBlueprint->NewVariables.Last().PropertyFlags &= ~CPF_DisableEditOnInstance;
+					VarGuid = InBlueprint->NewVariables.Last().VarGuid;
+				}
+			}
+		}
+		if(!VarGuid.IsValid())
+		{
+			return NAME_None;
+		}
+	}
+	FBPVariableDescription* PointerPtr = InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
+	if(!PointerPtr)
+	{
+		return NAME_None;
+	}
+	return PointerPtr->VarName;
+}
+
+void ULegacySeqVar_Int::Fill(ALegacyKismet* Kismet)
+{
+	Super::Fill(Kismet);
+}
+
+FName ULegacySeqVar_Named::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	if (ULegacySequenceVariable* Variable = FindVariable())
 	{
@@ -338,7 +444,7 @@ ULegacySequenceVariable* ULegacySeqVar_Named::FindVariable()
 	return nullptr;
 }
 
-FBPVariableDescription* ULegacySeqVar_ObjectList::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+FName ULegacySeqVar_ObjectList::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	if(!VarGuid.IsValid())
 	{
@@ -359,11 +465,15 @@ FBPVariableDescription* ULegacySeqVar_ObjectList::GetOrCreateVariable(UBlueprint
 		}
 		if(!VarGuid.IsValid())
 		{
-			return nullptr;
+			return NAME_None;
 		}
 	}
-	return InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
-
+	FBPVariableDescription* VariablePtr = InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
+	if (!VariablePtr)
+	{
+		return NAME_None;
+	}
+	return VariablePtr->VarName;
 }
 
 void ULegacySeqVar_ObjectList::Fill(ALegacyKismet* Kismet)
@@ -392,6 +502,11 @@ void ULegacySeqVar_ObjectList::Fill(ALegacyKismet* Kismet)
 			}
 		}
 	}
+}
+
+FName ULegacyXSeqVar_PlayerController::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	return GET_MEMBER_NAME_CHECKED(ALegacyKismet,PlayerController);
 }
 
 ULegacySeqAct_Interp::ULegacySeqAct_Interp()
@@ -442,9 +557,9 @@ UK2Node_SequenceAction* ULegacySeqAct_Interp::ExportToBlueprint(UBlueprint* InBl
 			{
 				EventName = *OutputLinks[i].LinkDesc;
 			}
-			EventName = GetLegacyName() + EventName;
-			
+			EventName = GetLegacyName() + TEXT("_") + EventName;
 			NewEventNode->CustomFunctionName = *EventName;
+			EventName2FunctionName.Add(OutputLinks[i].XLinkName,NewEventNode->CustomFunctionName);
 			NewEventNode->CreateNewGuid();
 			NewEventNode->PostPlacedNewNode();
 			NewEventNode->SetFlags(RF_Transactional);
@@ -571,7 +686,7 @@ void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>
 	
 	
 	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*InterpData->CurrentKismet,InterpGroup->GroupName.ToString());
-	UMovieSceneEventTrack* Track = Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->AddTrack<UMovieSceneEventTrack>(ObjectGuid);
+	UMovieSceneEventTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneEventTrack>(ObjectGuid);
 	UMovieSceneEventTriggerSection* Section = CastChecked<UMovieSceneEventTriggerSection>(Track->CreateNewSection());
 	Track->AddSection(*Section);
 	
@@ -610,18 +725,25 @@ void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>
 				// Bind the node to the event entry point
 				UEdGraphPin* BoundObjectPin = FMovieSceneDirectorBlueprintUtils::FindCallTargetPin(NewEventNode, EndpointDefinition.PossibleCallTargetClass);
 				FMovieSceneEventUtils::SetEndpoint(&NewKey, Section, NewEventNode, BoundObjectPin);
-
+				if (FName* FunctionName = InterpData->OwnerSeqAct_Interp->EventName2FunctionName.Find(Key.EventName))
 				{
 					FGraphNodeCreator<UK2Node_CallFunction> NodeCreator(*NewEventNode->GetGraph());
 					UK2Node_CallFunction* NextLogicStateNode = NodeCreator.CreateNode();
-					NextLogicStateNode->SetFromFunction(ALegacyKismet::StaticClass()->FindFunctionByName(""));
+					NextLogicStateNode->SetFromFunction(InterpData->CurrentKismet->GetClass()->FindFunctionByName(*FunctionName));
 					NodeCreator.Finalize();
 					NextLogicStateNode->NodePosX = NewEventNode->NodePosX + 450;
 					NextLogicStateNode->NodePosY = NewEventNode->NodePosY;
 					NewEventNode->GetThenPin()->MakeLinkTo(NextLogicStateNode->GetExecPin());
-					
-					UEdGraphPin* OutputPin = NextLogicStateNode->FindPin(UEdGraphSchema_K2::PN_ReturnValue, EGPD_Input);
-					UEdGraphPin* NewNodeReturnValuePin = NewEventNode->FindPin(UEdGraphSchema_K2::PN_ReturnValue, EGPD_Output);
+					UEdGraphPin* NewNodeReturnValuePin =  nullptr;
+					for (UEdGraphPin* Pin : NewEventNode->Pins)
+					{
+						if ((EGPD_Output == Pin->Direction) && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Object)
+						{
+							NewNodeReturnValuePin = Pin;
+							break;
+						}
+					}
+					UEdGraphPin* OutputPin = NextLogicStateNode->FindPin(UEdGraphSchema_K2::PN_Self, EGPD_Input);
 					if (OutputPin && NewNodeReturnValuePin)
 					{
 						NewNodeReturnValuePin->MakeLinkTo(OutputPin);
@@ -660,7 +782,7 @@ void ULegacyInterpTrackVisibility::ExportToLevelSequence(const TSharedRef<ISeque
 	
 	
 	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*Actor,InterpGroup->GroupName.ToString());
-	UMovieSceneVisibilityTrack* Track = Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->AddTrack<UMovieSceneVisibilityTrack>(ObjectGuid);
+	UMovieSceneVisibilityTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneVisibilityTrack>(ObjectGuid);
 	FName PropertyName =  AActor::GetHiddenPropertyName();
 	Track->SetPropertyNameAndPath( PropertyName, PropertyName.ToString());
 	
@@ -758,7 +880,7 @@ void ULegacyInterpTrackAnimControl::ExportToLevelSequence(const TSharedRef<ISequ
 
 	
 	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*SkeletalMeshComponent,InterpGroup->GroupName.ToString());
-	UMovieSceneSkeletalAnimationTrack* Track = Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->AddTrack<UMovieSceneSkeletalAnimationTrack>(ObjectGuid);
+	UMovieSceneSkeletalAnimationTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneSkeletalAnimationTrack>(ObjectGuid);
 	
 
 	for (FLegacyAnimControlTrackKey&Seq :AnimSeqs)
@@ -802,7 +924,7 @@ void ULegacyInterpTrackMove::ExportToLevelSequence(const TSharedRef<ISequencer>&
 		return;
 	}
 	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*SceneComponent,InterpGroup->GroupName.ToString());
-	UMovieScene3DTransformTrack* MovieSceneTrack = Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->AddTrack<UMovieScene3DTransformTrack>(ObjectGuid);
+	UMovieScene3DTransformTrack* MovieSceneTrack = InterpData->FindOrCreateTrack<UMovieScene3DTransformTrack>(ObjectGuid);
 	FTransform3f ComponentRotationTransform( FQuat4f(SceneComponent->GetComponentQuat()));
 	FTransform3f RotationTransform(	LegacyAction->Rotation);
 
@@ -848,7 +970,7 @@ void ULegacyInterpTrackMove::ExportToLevelSequence(const TSharedRef<ISequencer>&
 		 {
 		 case CIM_Linear:
 		 	InSceneValue.InterpMode = RCIM_Linear;
-		 	InSceneValue.TangentMode = RCTM_Auto;
+		 	InSceneValue.TangentMode = RCTM_None;
 		 	break;
 		 case CIM_CurveAuto:
 		 	InSceneValue.InterpMode = RCIM_Cubic;
@@ -856,7 +978,7 @@ void ULegacyInterpTrackMove::ExportToLevelSequence(const TSharedRef<ISequencer>&
 		 	break;
 		 case CIM_Constant:
 		 	InSceneValue.InterpMode = RCIM_Constant;
-		 	InSceneValue.TangentMode = RCTM_Auto;
+		 	InSceneValue.TangentMode = RCTM_None;
 		 	break;
 		 case CIM_CurveUser:
 		 	InSceneValue.InterpMode = RCIM_Cubic;
@@ -955,6 +1077,111 @@ void ULegacyInterpTrackMove::ExportToLevelSequence(const TSharedRef<ISequencer>&
 	Channels[8]->Set(ScaleFrameNumbers, ScaleZValues);
 }
 
+void ULegacyInterpTrackFloatMaterialParam::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
+{
+	AMaterialInstanceHybridActor * MaterialInstanceHybridActor = Cast<AMaterialInstanceHybridActor>(LegacyAction->PresentObject);
+	if (!MaterialInstanceHybridActor)
+	{
+		return;
+	}
+
+	ULegacyInterpGroup* InterpGroup = GetTypedOuter<ULegacyInterpGroup>();
+	if (!ensure(InterpGroup))
+	{
+		return;
+	}
+	
+	ULegacyInterpData* InterpData = GetTypedOuter<ULegacyInterpData>();
+	if (!ensure(InterpData))
+	{
+		return;
+	}
+
+	if (!MaterialInstanceHybridActor->MaterialInstance)
+	{
+		return;
+	}
+
+	FFrameRate FrameRate =  Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->GetTickResolution();
+	
+	auto SetSceneValue = [FrameRate](FMovieSceneFloatValue& InSceneValue,EInterpCurveMode CurveMode,float ArriveTangent,float LeaveTangent)
+	{
+		InSceneValue.InterpMode = RCIM_Cubic;
+		InSceneValue.TangentMode = RCTM_Auto;
+		switch (CurveMode)
+		{
+		case CIM_Linear:
+			InSceneValue.InterpMode = RCIM_Linear;
+			InSceneValue.TangentMode = RCTM_None;
+			break;
+		case CIM_CurveAuto:
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_Auto;
+			break;
+		case CIM_Constant:
+			InSceneValue.InterpMode = RCIM_Constant;
+			InSceneValue.TangentMode = RCTM_None;
+			break;
+		case CIM_CurveUser:
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_User;
+			break;
+		case CIM_CurveBreak:
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_Break;
+			break;
+		case CIM_CurveAutoClamped:
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_Auto;
+			break;
+		default: 
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_Auto;
+		}
+		InSceneValue.Tangent.ArriveTangent = ArriveTangent/FrameRate.AsDecimal();
+		InSceneValue.Tangent.LeaveTangent = LeaveTangent/FrameRate.AsDecimal();
+	};
+		
+	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*MaterialInstanceHybridActor,InterpGroup->GroupName.ToString());
+	UMovieSceneHybridMaterialTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneHybridMaterialTrack>(ObjectGuid);
+
+	
+	Track->SetMaterialHybrid(MaterialInstanceHybridActor->MaterialInstance);
+	
+	UMovieSceneHybridMaterialParameterSection* Section = CastChecked<UMovieSceneHybridMaterialParameterSection>(Track->CreateNewSection());
+
+	if (Section)
+	{
+		Track->Modify();
+		Track->AddSection(*Section);
+	}
+	
+	
+	FMovieSceneFloatChannel*FloatChannel =  Section->FindOrAddScalarParameterKey(ParamName);
+	check(FloatChannel);
+	Section->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
+	TArray<FFrameNumber> ScalarFrameNumbers;
+	TArray<FMovieSceneFloatValue> ScalarValues;
+
+	
+	ScalarFrameNumbers.Reserve(FloatTrack.Points.Num());
+	ScalarValues.Reserve(FloatTrack.Points.Num());
+
+	for (const FInterpCurvePoint<float>& Key :FloatTrack.Points)
+	{
+		FFrameNumber Time = Sequencer->GetRootTickResolution().AsFrameNumber(Key.InVal);
+		SetSceneValue(ScalarValues.Emplace_GetRef(Key.OutVal),Key.InterpMode,Key.ArriveTangent,Key.LeaveTangent);
+		ScalarFrameNumbers.Add(Time);
+		
+	}
+	Section->SetRange(TRange<FFrameNumber>::All());
+	FloatChannel->Set(ScalarFrameNumbers,ScalarValues);
+
+	
+	Super::ExportToLevelSequence(Sequencer, LegacyAction);
+	
+}
+
 void ULegacyInterpGroup::ExportToLevelSequence(ULegacySeqAct_Interp* OwnerSeqAction, const TSharedRef<ISequencer>&Sequencer)
 {
 	for (FLegacySeqVarLink& VarLink : OwnerSeqAction->VariableLinks)
@@ -986,6 +1213,22 @@ void ULegacyInterpGroup::ExportToLevelSequence(ULegacySeqAct_Interp* OwnerSeqAct
 						}
 					}
 				}
+				else if (ULegacySeqVar_ObjectList* Var_ObjectList = Cast<ULegacySeqVar_ObjectList>(Variable))
+				{
+					for (ULegacyObject* Object:Var_ObjectList->ObjList)
+					{
+						if (ULegacyActor* LegacyActor = Cast<ULegacyActor>(Object) )
+						{
+							for (ULegacyInterpTrack* InterpTrack :InterpTracks)
+							{
+								if (InterpTrack)
+								{
+									InterpTrack->ExportToLevelSequence(Sequencer,LegacyActor);
+								}
+							}
+						}
+					}
+				}
 			}
 			return;
 		}
@@ -1007,7 +1250,7 @@ UAnimSequence* ULegacyInterpGroup::FindAnimSequence(const FName& InName, USkelet
 	return nullptr;
 }
 
-FBPVariableDescription* ULegacyInterpData::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+FName ULegacyInterpData::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	if(!VarGuid.IsValid())
 	{
@@ -1026,11 +1269,15 @@ FBPVariableDescription* ULegacyInterpData::GetOrCreateVariable(UBlueprint* InBlu
 		}
 		if(!VarGuid.IsValid())
 		{
-			return nullptr;
+			return NAME_None;
 		}
 	}
-	return InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
-
+	FBPVariableDescription* PointerPtr = InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
+	if (!PointerPtr)
+	{
+		return NAME_None;
+	}
+	return PointerPtr->VarName;
 }
 
 void ULegacyInterpData::Fill(ALegacyKismet* Kismet)
@@ -1071,39 +1318,16 @@ ULevelSequence* ULegacyInterpData::GetOrCreateLevel()
 			ensure(OutNewObject);
 			return true;
 		}
-
-		// overwrite existing asset, if possible
-		if (ExistingAsset->GetClass()->IsChildOf(InClass))
-		{
-			OutNewObject = NewObject<UObject>(InParent, InClass, InName, InFlags, nullptr);
-			ensure(OutNewObject);
-			return true;
-		}
 		
 		// otherwise delete and replace
-		if (!ObjectTools::DeleteSingleObject(ExistingAsset))
+		if (!ObjectTools::ForceDeleteObjects({ExistingAsset},false))
 		{
 			UE_LOG(LogRedUELegacy, Warning, TEXT("Could not delete existing asset %s"), *ExistingAsset->GetFullName());
 			OutNewObject = nullptr;
 			return false;
 		}
 
-		// keep InPackage alive through the GC, in case ExistingAsset was the only reason it was around
-		const bool bRootedPackage = InParent->IsRooted();
-
-		if (!bRootedPackage)
-		{
-			InParent->AddToRoot();
-		}
-
-		// force GC so we can cleanly create a new asset (and not do an 'in place' replacement)
-		CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
-
-		if (!bRootedPackage)
-		{
-			InParent->RemoveFromRoot();
-		}
-
+		InParent = CreatePackage(*Path);
 		// try to find the existing asset again now that the GC has occurred
 		ExistingAsset = StaticFindObject(nullptr, InParent, *InName.ToString());
 
@@ -1114,7 +1338,6 @@ ULevelSequence* ULegacyInterpData::GetOrCreateLevel()
 			OutNewObject = nullptr;
 			return false;
 		}
-
 		// create the asset in the package
 		OutNewObject = NewObject<UObject>(InParent, InClass, InName, InFlags, nullptr);
 		ensure(OutNewObject);

@@ -5,10 +5,12 @@
 
 
 UCLASS()
-class REDUELEGACYGAME_API USeqEvent_LevelLoaded : public USequenceAction
+class REDUELEGACYGAME_API USeqEvent_LevelLoaded : public USequenceEvent
 {
 	GENERATED_BODY()
 public:
+	virtual void BeginPlay() override;
+	
 	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
 	FSequenceActionDelegate LoadedAndVisible;
 

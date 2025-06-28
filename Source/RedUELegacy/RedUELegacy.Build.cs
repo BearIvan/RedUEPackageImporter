@@ -9,30 +9,30 @@ public class RedUELegacy : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PrivatePCHHeaderFile = "Private/RedUELegacyPCH.h";
 
-
 		PublicIncludePaths.AddRange(
-			new string[] {
+			new string[]
+			{
 				"Public"
 			}
-			);
-				
-		
+		);
+
+
 		PrivateIncludePaths.AddRange(
-			new string[] {
+			new string[]
+			{
 				"Private"
 			}
-			);
-			
-		
+		);
+
+
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",
-				// ... add other public dependencies that you statically link with here ...
+				"Core", "MovieScene",
 			}
-			);
-			
-		
+		);
+
+
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
@@ -43,36 +43,30 @@ public class RedUELegacy : ModuleRules
 				"RenderCore",
 				"Projects",
 				"UnrealEd",
-                "InputCore",
-                "MeshDescription",
-                "StaticMeshDescription",
-                "MaterialEditor",
-                "MaterialUtilities", 
-                "zlib",
-                "LZO",
-                "LZX",
+				"InputCore",
+				"MeshDescription",
+				"StaticMeshDescription",
+				"MaterialEditor",
+				"MaterialUtilities",
+				"zlib",
+				"LZO",
+				"LZX",
 				"RedImage",
-                "EditorSubsystem",
-                "RedUELegacyGame",
-                "BlueprintGraph",
-                "KismetCompiler",
-                "AssetDefinition",
-                "Kismet",
-                "PropertyEditor", 
-                "LevelSequence", 
-                "MovieScene", 
-                "Sequencer",
-                "MovieSceneTracks", "MovieSceneTools", 
-                // ... add private dependencies that you statically link with here ...	
+				"EditorSubsystem",
+				"RedUELegacyGame",
+				"BlueprintGraph",
+				"KismetCompiler",
+				"AssetDefinition",
+				"Kismet",
+				"PropertyEditor",
+				"LevelSequence",
+				"MovieScene",
+				"Sequencer",
+				"MovieSceneTracks",
+				"MovieSceneTools",
+				"GraphEditor",
+				"ToolMenus"
 			}
-			);
-		
-		
-		DynamicallyLoadedModuleNames.AddRange(
-			new string[]
-			{
-				// ... add any modules that your module loads dynamically here ...
-			}
-			);
+		);
 	}
 }

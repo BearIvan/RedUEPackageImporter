@@ -23,3 +23,8 @@ void UXSeqAct_StopSmartTerrain::In()
 void UXSeqAct_StopSmartTerrain::RequestOutro()
 {
 }
+
+void UXSeqAct_TeleportElizabethToPlayer::In()
+{
+	Out.Broadcast();
+}

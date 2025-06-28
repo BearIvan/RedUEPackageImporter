@@ -2,4 +2,5 @@
 
 void USeqAct_JoinFloatingSection::In()
 {
+	Out.Broadcast();
 }

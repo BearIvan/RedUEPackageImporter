@@ -2,21 +2,34 @@
 
 #include "LegacyKismet.generated.h"
 
+class USeqEvent_RemoteEvent;
+
 UCLASS()
 class REDUELEGACYGAME_API ALegacyKismet : public AActor
 {
 	GENERATED_BODY()
 
 public:
-					ALegacyKismet	();
-	virtual void	BeginPlay		() override;
-	virtual void	Tick			(float DeltaTime) override;
+					ALegacyKismet		();
+	virtual void	BeginPlay			() override;
+	virtual void	Tick				(float DeltaTime) override;
+	virtual void	ActivateRemoteEvent (const FName&InName);
 
+	
 	UFUNCTION(BlueprintCallable,Category="Legacy|Kismet", meta = (ComponentClass = "/Script/RedUELegacyGame.SequenceAction",DeterminesOutputType = "SequenceActionClass"))
 	USequenceAction*GetSequenceAction(FGuid ActionGuid,TSubclassOf<USequenceAction> SequenceActionClass);
 
 	UPROPERTY(VisibleInstanceOnly)
 	TMap<FGuid,USequenceAction*> SequenceActions;
+	
+	UPROPERTY(VisibleInstanceOnly)
+	TMap<FName,USeqEvent_RemoteEvent*> SequenceRemoteEvents;
+
+	UPROPERTY(BlueprintReadOnly, Category="Kismet|Bioshock")
+	APlayerController* PlayerController;
+private:
+	UPROPERTY()
+	bool bFirstTick;
 };
 
 

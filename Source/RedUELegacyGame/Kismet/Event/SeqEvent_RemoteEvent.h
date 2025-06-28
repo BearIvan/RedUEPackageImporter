@@ -4,7 +4,7 @@
 #include "SeqEvent_RemoteEvent.generated.h"
 
 UCLASS()
-class REDUELEGACYGAME_API USeqEvent_RemoteEvent : public USequenceAction
+class REDUELEGACYGAME_API USeqEvent_RemoteEvent : public USequenceEvent
 {
 	GENERATED_BODY()
 public:

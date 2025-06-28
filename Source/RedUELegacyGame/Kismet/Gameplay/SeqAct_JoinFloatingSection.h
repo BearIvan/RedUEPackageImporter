@@ -16,4 +16,9 @@ public:
 	
 	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
 	FSequenceActionDelegate Out;
+
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
+	TArray<AActor*> Targets;
+
+	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Targets);
 };

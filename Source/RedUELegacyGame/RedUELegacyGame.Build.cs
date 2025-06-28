@@ -24,7 +24,9 @@ public class RedUELegacyGame : ModuleRules
                 "UnrealEd",
                 "RenderCore",
                 "LevelSequence",
-                "MovieScene"
+                "MovieScene",
+                "MovieSceneTools",
+                "MovieSceneTracks"
             }
         );
         

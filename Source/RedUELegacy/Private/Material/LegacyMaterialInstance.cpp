@@ -5,6 +5,7 @@
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacyGame.h"
 #include "Material/LegacyTexture3.h"
+#include "Materials/Hybrid/MaterialInstanceHybrid.h"
 
 bool ULegacyMaterialInstance::LegacySupport_Implementation(ERedUELegacyEngineType EngineType, ERedUELegacyGameType GameType)
 {
@@ -146,7 +147,9 @@ UObject* ULegacyMaterialInstance::ExportToContent()
 	if(!MaterialResult)
 	{
 		UPackage*  AssetPackage = CreatePackage(*PackageName);
-		UMaterialInstanceConstant* Material = NewObject<UMaterialInstanceConstant>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
+		UMaterialInstanceHybrid* HybridMaterial = NewObject<UMaterialInstanceHybrid>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
+		UMaterialInstanceConstant* Material = CastChecked<UMaterialInstanceConstant>(HybridMaterial->Parent);
+		HybridMaterial->PreEditChange(nullptr);
 		Material->PreEditChange(nullptr);
 		FAssetRegistryModule::AssetCreated(Material);
 		FStaticParameterSet NewStaticParameterSet;
@@ -192,11 +195,19 @@ UObject* ULegacyMaterialInstance::ExportToContent()
 		}
 		
 		Material->Parent = CastChecked<UMaterialInterface>( Parent->ExportToContent(),ECastCheckedType::NullAllowed);
+		if (UMaterialInstanceHybrid* ParentHybrid = Cast<UMaterialInstanceHybrid>(Material->Parent))
+		{
+			Material->Parent = ParentHybrid->Parent;
+		}
 		Material->UpdateStaticPermutation(NewStaticParameterSet);
 		Material->InitStaticPermutation();
 		Material->PostEditChange();
 		Material->Modify();
-		MaterialResult = Material;
+		HybridMaterial->InitializeMID(HybridMaterial->Parent);
+		HybridMaterial->UpdateStaticPermutation();
+		HybridMaterial->PostEditChange();
+		HybridMaterial->Modify();
+		MaterialResult = HybridMaterial;
 	}
 	PresentObject = MaterialResult;
 	return MaterialResult;

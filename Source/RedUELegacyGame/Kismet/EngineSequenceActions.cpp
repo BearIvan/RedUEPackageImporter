@@ -1,10 +1,10 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
+﻿#include "EngineSequenceActions.h"
 
-
-#include "EngineSequenceActions.h"
+#include "Kismet/GameplayStatics.h"
 
 void USeqAct_SetMaterial::In()
 {
+	Out.Broadcast();
 }
 
 void USeqAct_ToggleHidden::Hide()
@@ -47,4 +47,169 @@ void USeqAct_ToggleHidden::Toggle()
 		Actor->SetActorHiddenInGame(!Actor->IsHidden());
 	}
 	Out.Broadcast();
+}
+
+void USeqAct_Toggle::TurnOn()
+{
+	Out.Broadcast();
+}
+
+void USeqAct_Toggle::TurnOff()
+{
+	Out.Broadcast();
+}
+
+void USeqAct_Toggle::Toggle()
+{
+	Out.Broadcast();
+}
+
+USeqAct_Delay::USeqAct_Delay()
+{
+	CurrentTime = 0;
+	Paused = false;
+}
+
+void USeqAct_Delay::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (CurrentTime > 0 && !Paused)
+	{
+		CurrentTime -= DeltaTime;
+		if (CurrentTime <= 0)
+		{
+			Finished.Broadcast();
+		}
+	}
+}
+
+void USeqAct_Delay::Start()
+{
+	if (Paused)
+	{
+		Paused = false;
+		return;
+	}
+	CurrentTime = GetDuration();
+}
+
+void USeqAct_Delay::Stop()
+{
+	if (CurrentTime > 0)
+	{
+		Aborted.Broadcast();
+	}
+	Paused = false;
+	CurrentTime = 0;
+}
+
+void USeqAct_Delay::Pause()
+{
+	if (CurrentTime > 0)
+	{
+		Paused = true;
+	}
+}
+
+void UXSeqAct_PlayEffect::Play()
+{
+	Out.Broadcast();
+}
+
+void UXSeqAct_PlayEffect::Stop()
+{
+}
+
+void UXSeqAct_PlaySound::Play()
+{
+	Out.Broadcast();
+}
+
+void UXSeqAct_PlaySound::Stop()
+{
+}
+
+void USeqAct_SetPhysics::In()
+{
+	Out.Broadcast();
+}
+
+void USeqAct_Log::In()
+{
+	Out.Broadcast();
+}
+
+USeqAct_CameraFade::USeqAct_CameraFade()
+{
+	FadeOpacity = 1;
+	FadeTime = 1;
+	FadeColor = FColor::Black;
+	BeginFadeOpacity = 0;
+}
+
+void USeqAct_CameraFade::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (CachePC)
+	{
+		if (!CachePC->PlayerCameraManager->bEnableFading)
+		{
+			CachePC = nullptr;
+			Finished.Broadcast();
+		}
+	}
+}
+
+void USeqAct_CameraFade::In()
+{
+	CachePC = nullptr;
+	TArray<AActor*> InTargets = GetTargets();
+	if (Targets.Num() > 0)
+	{
+		CachePC = Cast<APlayerController>(Targets[0]);
+	}
+	if (!CachePC)
+	{
+		CachePC = UGameplayStatics::GetPlayerController(this,0);
+	}
+	if (CachePC)
+	{
+		CachePC->PlayerCameraManager->StartCameraFade(BeginFadeOpacity,FadeOpacity,FadeTime,FadeColor);
+	}
+	Out.Broadcast();
+}
+
+void USeqAct_Teleport::In()
+{
+	AActor* InDestination = GetDestination();
+	if (InDestination)
+	{
+		TArray<AActor*> InTargets = GetTargets();
+		for (AActor* Actor:InTargets)
+		{
+			if (APlayerController*PC = Cast<APlayerController>(Actor))
+			{
+				PC->GetPawn()->TeleportTo(InDestination->GetActorLocation(),InDestination->GetActorRotation());
+			}
+			else if (Actor)
+			{
+				Actor->TeleportTo(InDestination->GetActorLocation(),InDestination->GetActorRotation());
+			}
+		}
+	}
+	Out.Broadcast();
+}
+
+void USeqEvent_Console::In()
+{
+	Out.Broadcast();
+}
+
+void UXSeqAct_MultiLevelStreaming::Load()
+{
+}
+
+void UXSeqAct_MultiLevelStreaming::Unload()
+{
+	
 }

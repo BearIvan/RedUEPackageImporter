@@ -3,6 +3,17 @@
 #include "LegacyActorComponent.h"
 #include "LegacyLightComponent.generated.h"
 
+class ULegacyMaterialInterface;
+
+UCLASS()
+class REDUELEGACY_API ULegacyLightFunction : public ULegacyObject
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadWrite)
+	ULegacyMaterialInterface* SourceMaterial;
+};
+
 UCLASS()
 class REDUELEGACY_API ULegacyLightComponent : public ULegacyActorComponent
 {
@@ -16,6 +27,9 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	FColor LightColor;
+	
+	UPROPERTY(BlueprintReadWrite)
+	ULegacyLightFunction* Function;
 };
 
 UCLASS()

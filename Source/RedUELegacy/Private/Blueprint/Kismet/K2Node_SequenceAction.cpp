@@ -9,10 +9,12 @@
 #include "K2Node_CustomEvent.h"
 #include "KismetCompiler.h"
 #include "LegacyKismetCompilerContext.h"
+#include "ScopedTransaction.h"
 #include "Kismet/Base/LegacyKismet.h"
 #include "Kismet/Base/SequenceAction.h"
 #include "Kismet2/BlueprintEditorUtils.h"
-
+#include "KismetNodes/SGraphNodeK2Event.h"
+#include "UI/SGraphNodeK2SequenceAction.h"
 
 
 /////////////////////////////////////////////////////
@@ -34,7 +36,7 @@ public:
 /////////////////////////////////////////////////////
 // UK2Node_SequenceAction
 UK2Node_SequenceAction::UK2Node_SequenceAction(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+	: Super(ObjectInitializer), Action(nullptr)
 {
 }
 
@@ -78,7 +80,7 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 	{
 		return;
 	}
-	
+	InputEventsName = NAME_None;
 	UClass*ActionClass = Action->GetClass();
 	
 	for (TFieldIterator<UFunction>  FunctionIT(ActionClass); FunctionIT; ++FunctionIT)
@@ -112,8 +114,35 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 				LegacyIndexToVariableName.Add(PropertyIt->GetIntMetaData(TEXT("LegacyIndex")),PropertyIt->GetFName());
 			}
 		}
+		else if (PropertyIt->HasMetaData(TEXT("KismetEvent")))
+		{
+			if (!ensure(InputEventsName == NAME_None))
+			{
+				continue;
+			}
+			FArrayProperty* EventProperty = CastField<FArrayProperty>(*PropertyIt);
+			if (!ensure(EventProperty))
+			{
+				continue;
+			}
+			FStructProperty* EventInnerProperty =  CastField<FStructProperty>(EventProperty->Inner);
+			if (!ensure(EventInnerProperty))
+			{
+				continue;
+			}
+			if (!ensure(EventInnerProperty->Struct == TBaseStructure<FGuid>::Get()))
+			{
+				continue;
+			}
+			InputEventsName = PropertyIt->GetFName();
+		}
 	}
-
+	
+	if (ActionClass->IsChildOf(USequenceEvent::StaticClass()))
+	{
+		CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Delegate, UK2Node_Event::DelegateOutputName);
+	}
+	CreateEventPins();
 	
 }
 
@@ -193,10 +222,98 @@ void UK2Node_SequenceAction::ExpandNode(FKismetCompilerContext& CompilerContext,
 			}
 		}
 	}
+	if (FArrayProperty* InputEventsProperty =  CastField<FArrayProperty>(ActionClass->FindPropertyByName(InputEventsName)))
+	{
+		FScriptArrayHelper_InContainer InputEventsArray(InputEventsProperty,Action);
+		InputEventsArray.EmptyValues();
+		TSet<FGuid> InputEventsGuids;
+		for (UEdGraphPin* CurrentPin : Pins)
+		{
+			if (CurrentPin && CurrentPin->Direction == EGPD_Input && CurrentPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Delegate&& CurrentPin->LinkedTo.Num() > 0)
+			{
+				
+				ensure(CurrentPin->LinkedTo.Num()==1);
+				if (CurrentPin->LinkedTo[0])
+				{
+					UK2Node_SequenceAction* InSequenceAction =  Cast<UK2Node_SequenceAction>( CurrentPin->LinkedTo[0]->GetOwningNode());
+					if (!InSequenceAction)
+					{
+						const FText NodeName = FText::FromString(CurrentPin->LinkedTo[0]->GetOwningNode()->GetName());
+						const FString FormattedMessage = FText::Format(
+							NSLOCTEXT("RedUELegacy","SequenceActionInputEventError0Fmt", "SequenceAction: Input event {0} link only for UK2Node_SequenceAction, now refers to node {1} for action @@"),
+							FText::FromString(CurrentPin->PinName.GetPlainNameString()),
+							NodeName
+						).ToString();
+				
+						CompilerContext.MessageLog.Error(*FormattedMessage, this);
+						return;
+					}
+					if (!InSequenceAction->Action)
+					{
+						
+						const FText NodeName = FText::FromString(InSequenceAction->GetName());
+						const FString FormattedMessage = FText::Format(
+							NSLOCTEXT("RedUELegacy","SequenceActionInputEventError1Fmt", "SequenceAction: Input event {0} refers to node {1} have empty action for action @@"),
+							FText::FromString(CurrentPin->PinName.GetPlainNameString()),
+							NodeName
+						).ToString();
+				
+						CompilerContext.MessageLog.Error(*FormattedMessage, this);
+						return;
+					}
+					if (!InSequenceAction->Action->IsA<USequenceEvent>())
+					{
+						
+						const FText NodeName = FText::FromString(InSequenceAction->GetName());
+						const FString FormattedMessage = FText::Format(
+							NSLOCTEXT("RedUELegacy","SequenceActionInputEventError2Fmt", "SequenceAction: Input event {0} link only for UK2Node_SequenceAction, refers to node {1} in which action is not child of SequenceEvent for action @@"),
+							FText::FromString(CurrentPin->PinName.GetPlainNameString()),
+							NodeName
+						).ToString();
+				
+						CompilerContext.MessageLog.Error(*FormattedMessage, this);
+						return;
+					}
+					if (InputEventsGuids.Contains(InSequenceAction->NodeGuid))
+					{
+						continue;
+					}
+					InputEventsGuids.Add(InSequenceAction->NodeGuid);
+					FGuid* ActionGuid = reinterpret_cast<FGuid*>( InputEventsArray.GetRawPtr(InputEventsArray.AddValue()));
+					*ActionGuid = InSequenceAction->NodeGuid;
+				}
+			}
+		}
+	}
 	
 	if (!bIsErrorFree)
 	{
 		CompilerContext.MessageLog.Error(*NSLOCTEXT("RedUELegacy","InternalConnectionError", "SequenceAction: Internal connection error. @@").ToString(), this);
+	}
+	
+	if (ActionClass->IsChildOf(USequenceEvent::StaticClass()))
+	{
+		for (UEdGraphPin* CurrentPin : Pins)
+		{
+			if (CurrentPin && CurrentPin->Direction == EGPD_Output && CurrentPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Delegate&& CurrentPin->LinkedTo.Num() > 0)
+			{
+				for (UEdGraphPin* LinkedPin :  CurrentPin->LinkedTo)
+				{
+					if (!Cast<UK2Node_SequenceAction>(LinkedPin->GetOwningNode())&&LinkedPin->GetOwningNode())
+					{
+						const FText NodeName = FText::FromString(LinkedPin->GetOwningNode()->GetName());
+						const FString FormattedMessage = FText::Format(
+							NSLOCTEXT("RedUELegacy","SequenceActionOutputEventErrorFmt", "SequenceAction: Output event {0} link only for UK2Node_SequenceAction, refers to node {1} in which action is not child of SequenceEvent for action @@"),
+							FText::FromString(CurrentPin->PinName.GetPlainNameString()),
+							NodeName
+						).ToString();
+				
+						CompilerContext.MessageLog.Error(*FormattedMessage, this);
+						return;
+					}
+				}
+			}
+		}
 	}
 	// Create a call to factory the proxy object
 	BreakAllNodeLinks();
@@ -261,6 +378,120 @@ FText UK2Node_SequenceAction::GetNodeTitle(ENodeTitleType::Type TitleType) const
 bool UK2Node_SequenceAction::IsNodeRootSet() const
 {
 	return true;
+}
+
+TSharedPtr<SGraphNode> UK2Node_SequenceAction::CreateVisualWidget()
+{
+	return SNew(SGraphNodeK2SequenceAction, this);
+}
+
+bool UK2Node_SequenceAction::CanAddEventPin() const
+{
+	if (!Action)
+	{
+		return false;
+	}
+	return InputEventsName != NAME_None;
+}
+
+void UK2Node_SequenceAction::AddEventPin()
+{
+	const FScopedTransaction Transaction( NSLOCTEXT("RedUELegacy","AddSequenceActionEvent_Transaction","Add Event Input") );
+	Modify();
+	CreateEventPin();
+
+
+	GetGraph()->NotifyGraphChanged();
+	
+					
+	UBlueprint* Blueprint = FBlueprintEditorUtils::FindBlueprintForGraphChecked(GetGraph());
+	if (ensure(Blueprint))
+	{
+		FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+	}
+}
+
+void UK2Node_SequenceAction::CreateEventPins()
+{
+	if (!CanAddEventPin())
+	{
+		return;
+	}
+	
+	int32 OldEventPinsCount = EventPinsCount;
+	EventPinsCount = 0;
+	for (int32 i = 0; i < OldEventPinsCount; ++i)
+	{
+		AddEventPin();
+	}
+}
+
+void UK2Node_SequenceAction::CreateEventPin()
+{
+	UEdGraphPin* NewPin = CreatePin(EGPD_Input, UEdGraphSchema_K2::PC_Delegate, *FString::Printf(TEXT("Event %d"), EventPinsCount));
+	if (NewPin->PinName.IsNone())
+	{
+		NewPin->PinName = CreateUniquePinName(TEXT("Event"));
+		NewPin->PinFriendlyName = FText::FromString(TEXT(" "));
+	}
+	EventPinsCount++;
+}
+
+void UK2Node_SequenceAction::RemoveEventPin(UEdGraphPin* InGraphPin)
+{
+	const FScopedTransaction Transaction( NSLOCTEXT("RedUELegacy","DeleteSequenceActionEvent_Transaction", "Delete Event Input") );
+	Modify();
+
+	TArray<class UEdGraphPin*> EventPins;
+	GetEventPins(EventPins);
+
+	for (int32 OutputIndex = 0; OutputIndex < EventPins.Num(); OutputIndex++)
+	{
+		if (InGraphPin == EventPins[OutputIndex])
+		{
+			InGraphPin->MarkAsGarbage();
+			Pins.Remove(InGraphPin);
+			EventPinsCount--;
+			break;
+		}
+	}
+
+	GetEventPins(EventPins);
+	for (int32 OutputIndex = 0; OutputIndex < EventPins.Num(); OutputIndex++)
+	{
+		EventPins[OutputIndex]->PinName = *FString::Printf(TEXT("Event %d"),OutputIndex);
+	}
+	GetGraph()->NotifyGraphChanged();
+	
+	UBlueprint* Blueprint = FBlueprintEditorUtils::FindBlueprintForGraphChecked(GetGraph());
+	if (ensure(Blueprint))
+	{
+		FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+	}
+}
+
+void UK2Node_SequenceAction::GetEventPins(TArray<UEdGraphPin*>& OutPins)
+{
+	OutPins.Empty();
+	for (UEdGraphPin* Pin : Pins)
+	{
+		if (Pin->Direction == EGPD_Input&&Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Delegate)
+		{
+			OutPins.Add(Pin);
+		}
+	}
+}
+
+UEdGraphPin* UK2Node_SequenceAction::GetEventOutput()
+{
+	for (UEdGraphPin* Pin : Pins)
+	{
+		if (Pin->Direction == EGPD_Output&&Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Delegate)
+		{
+			return Pin;
+		}
+	}
+	return nullptr;
 }
 
 class FNodeHandlingFunctor* UK2Node_SequenceAction::CreateNodeHandler(class FKismetCompilerContext& CompilerContext) const

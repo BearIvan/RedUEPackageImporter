@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "LevelSequence.h"
+#include "MovieScene.h"
 #include "Core/LegacyObject.h"
 #include "LegacySequenceObjects.generated.h"
 class ALegacyKismet;
@@ -177,7 +179,7 @@ struct FLegacySeqEventLink
 	GENERATED_BODY()
 	
 	UPROPERTY(BlueprintReadWrite)
-	TArray<class ULegacySequenceEvent*> LinkedEvents;
+	TArray<class ULegacySequenceOp*> LinkedEvents;
 	
 	UPROPERTY(BlueprintReadWrite)
 	FString LinkDesc;
@@ -211,6 +213,7 @@ class REDUELEGACY_API ULegacySequenceOp : public ULegacySequenceObject
 public:
 	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph);
 	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph);
+	virtual UEdGraphPin*			GetEventPin			(UBlueprint* InBlueprint,UEdGraph* InGraph);
 	virtual void					SimulatedImport	();
 	
 	UPROPERTY(BlueprintReadWrite)
@@ -310,8 +313,7 @@ class ULegacySequenceVariable : public ULegacySequenceObject
 {
 	GENERATED_BODY()
 public:
-	virtual UK2Node*					CreateGetNode			(UBlueprint* InBlueprint,UEdGraph* InGraph);
-	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph);
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph);
 	virtual void						Fill					(ALegacyKismet* Kismet);
 	
 	UPROPERTY(BlueprintReadWrite)
@@ -326,7 +328,7 @@ class REDUELEGACY_API ULegacySeqVar_Object : public ULegacySequenceVariable
 {
 	GENERATED_BODY()
 public:
-	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	virtual void						Fill					(ALegacyKismet* Kismet);
 	
 	UPROPERTY(BlueprintReadWrite)
@@ -335,11 +337,37 @@ public:
 };
 
 UCLASS()
+class REDUELEGACY_API ULegacySeqVar_Bool : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						Fill					(ALegacyKismet* Kismet) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool bValue;
+	
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacySeqVar_Int : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						Fill					(ALegacyKismet* Kismet) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	int32 IntValue;
+	
+};
+
+UCLASS()
 class REDUELEGACY_API ULegacySeqVar_Named: public ULegacySequenceVariable
 {
 	GENERATED_BODY()
 public:
-	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	virtual void						Fill					(ALegacyKismet* Kismet);
 
 	ULegacySequenceVariable*			FindVariable			();
@@ -355,7 +383,7 @@ class REDUELEGACY_API ULegacySeqVar_ObjectList : public ULegacySequenceVariable
 {
 	GENERATED_BODY()
 public:
-	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	virtual void						Fill					(ALegacyKismet* Kismet);
 	
 	UPROPERTY(BlueprintReadWrite)
@@ -363,6 +391,21 @@ public:
 	
 };
 
+UCLASS()
+class REDUELEGACY_API ULegacyXSeqVar_PlayerController : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	
+	
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXSeqVar_SinglePlayerController : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+};
 
 UCLASS()
 class REDUELEGACY_API USeqAct_ToggleCinematicMode : public ULegacySequenceAction
@@ -421,6 +464,8 @@ public:
 	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	
 	virtual void					SimulatedImport	() override;
+
+	TMap<FName,FName>				EventName2FunctionName;
 };
 
 UCLASS()
@@ -604,6 +649,22 @@ public:
 	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
 	
 };
+
+UCLASS()
+class ULegacyInterpTrackFloatMaterialParam : public ULegacyInterpTrack
+{
+public:
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName ParamName;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FInterpCurveFloat FloatTrack;
+	
+	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
+};
+
 UCLASS()
 class REDUELEGACY_API ULegacyInterpGroup : public ULegacyObject
 {
@@ -629,12 +690,26 @@ class REDUELEGACY_API ULegacyInterpData : public ULegacySequenceVariable
 	GENERATED_BODY()
 public:
 	
-	virtual FBPVariableDescription*		GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	virtual void						Fill					(ALegacyKismet* Kismet) override;
 			ULevelSequence*				GetOrCreateLevel		();
 			void						ExportToLevelSequence	(ULegacySeqAct_Interp* OwnerSeqAction ,ULevelSequence* LevelSequence);
 			FGuid						FindOrCreateBinding		(AActor& ActorToBind,const FString&NameBinding);
 			FGuid						FindOrCreateBinding		(USceneComponent& ComponentToBind,const FString&NameBinding);
+			template<typename T>
+			T*							FindOrCreateTrack		(FGuid ObjectGuid)
+			{
+				UMovieScene* MovieScene = LevelSequence->GetMovieScene();
+				if (!MovieScene)
+				{
+					return nullptr;
+				}
+				if (T*Result =  MovieScene->FindTrack<T>(ObjectGuid))
+				{
+					return Result;
+				}
+				return MovieScene->AddTrack<T>(ObjectGuid);
+			}
 	
 	UPROPERTY(BlueprintReadWrite)
 	float InterpLength;

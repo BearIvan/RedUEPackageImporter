@@ -2,6 +2,7 @@
 
 #include "Editor.h"
 #include "Actors/XFloatingSection.h"
+#include "Actors/XMatineeCameraActor.h"
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacySubsystem.h"
 #include "World/LegacyWorld.h"
@@ -41,19 +42,18 @@ UClass* ULegacyMarker::GetActorClass_Implementation()
 	return ATargetPoint::StaticClass();
 }
 
+UClass* ULegacyXMatineeCameraActor::GetActorClass_Implementation()
+{
+	return AXMatineeCameraActor::StaticClass();
+}
+
 
 void ULegacyXMatineeCameraActor::FillActor_Implementation(AActor* InActor)
 {
 	Super::FillActor_Implementation(InActor);
 
-	ACameraActor* CameraActor = CastChecked<ACameraActor>(InActor);
-	
-	USkeletalMeshComponent* InSkeletalMeshComponent = NewObject< USkeletalMeshComponent>(CameraActor, NAME_None, RF_Transactional);
-	CameraActor->AddInstanceComponent(InSkeletalMeshComponent);
-	InSkeletalMeshComponent->AttachToComponent(CameraActor->GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-	InSkeletalMeshComponent->OnComponentCreated();
-	InSkeletalMeshComponent->RegisterComponent();
-	SkeletalMeshComponent->FillComponent(InSkeletalMeshComponent);
+	AXMatineeCameraActor* CameraActor = CastChecked<AXMatineeCameraActor>(InActor);
+	SkeletalMeshComponent->FillComponent(CameraActor->SkeletalMesh);
 }
 
 void ULegacyWorldInfo::GetStreamingLevels(TArray<ULegacyLevelStreaming*>& OutStreamingLevels)

@@ -1,5 +1,7 @@
 ﻿#include "World/Components/LegacyLightComponent.h"
 
+#include "Material/LegacyMaterialInterface.h"
+
 void ULegacyLightComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
 {
 	Super::FillComponent_Implementation(InActorComponent);
@@ -10,8 +12,22 @@ void ULegacyLightComponent::FillComponent_Implementation(UActorComponent* InActo
 		LocalLightComponent->IntensityUnits = ELightUnits::EV;
 	}
 	LightComponent->SetMobility( EComponentMobility::Movable);
-	LightComponent->SetIntensity(Brightness);
+	LightComponent->SetIntensity(FMath::Min(Brightness,20.f));
+	if (Function)
+	{
+		if (Function->SourceMaterial)
+		{
+			if (UMaterialInterface* InSourceMaterial = Cast<UMaterialInterface>( Function->SourceMaterial->ExportToContent()))
+			{
+				LightComponent->SetLightFunctionMaterial(InSourceMaterial);
+			}
+		}
+	}
 	
+	FQuat NeedRotation = FQuat(FRotator(90, 0, 0));
+	FQuat SpotRotation = LightComponent->GetComponentQuat();
+	SpotRotation = SpotRotation*NeedRotation;
+	LightComponent->SetWorldRotation(SpotRotation);
 }
 
 void ULegacyPointLightComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
@@ -23,7 +39,8 @@ void ULegacyPointLightComponent::FillComponent_Implementation(UActorComponent* I
 	{
 		PointLightComponent->SetRelativeLocation(FVector(Translation));
 	}
-	PointLightComponent->SetAttenuationRadius(Radius);
+	PointLightComponent->SetAttenuationRadius(Radius*2.f);
+
 }
 
 void ULegacySpotLightComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
@@ -32,10 +49,7 @@ void ULegacySpotLightComponent::FillComponent_Implementation(UActorComponent* In
 	USpotLightComponent* SpotLightComponent =  CastChecked<USpotLightComponent>(InActorComponent);
 	SpotLightComponent->InnerConeAngle = InnerConeAngle;
 	SpotLightComponent->OuterConeAngle = OuterConeAngle;
-	static FQuat NeedRotation = FQuat(FRotator(-90.f, 0, 0));
-	FQuat SpotRotation = SpotLightComponent->GetComponentQuat();
-	SpotRotation = SpotRotation*NeedRotation;
-	SpotLightComponent->SetWorldRotation(SpotRotation);
+
 	
 	
 	// if (SpotLightComponent->GetAttachmentRootActor()->GetRootComponent() != InActorComponent)

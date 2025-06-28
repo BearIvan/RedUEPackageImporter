@@ -14,6 +14,7 @@ public:
 			void		GenerateBlueprint	(ULegacyKismetBlueprint* InBlueprint,UEdGraph* EventGraph);
 	virtual UObject*	ExportToContent		() override;
 			bool		SortNode			(class UEdGraphNode* Start, TSet<class UEdGraphNode*>& Nodes, float& Y, float X);
+			void		GetLinkedNodes		(class UEdGraphNode* Start, TSet<class UEdGraphNode*>& LinkedNodes);
 	
 
 	UPROPERTY(BlueprintReadWrite)

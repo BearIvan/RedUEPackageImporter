@@ -82,7 +82,9 @@ class REDUELEGACY_API ULegacyXMatineeCameraActor : public ULegacyCameraActor
 {
 	GENERATED_BODY()
 public:
-	virtual void FillActor_Implementation(AActor* InActor) override;
+	
+	virtual UClass* GetActorClass_Implementation	() override;
+	virtual void	FillActor_Implementation		(AActor* InActor) override;
 	
 	UPROPERTY(BlueprintReadWrite)
 	class ULegacySkeletalMeshComponent* SkeletalMeshComponent;

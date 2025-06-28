@@ -101,7 +101,7 @@ void Set##VariableName(const TArray<VariableType>&InValue)\
 
 
 
-
+class ALegacyKismet;
 class USequenceAction;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSequenceActionDelegate);
 
@@ -119,11 +119,12 @@ class REDUELEGACYGAME_API USequenceAction : public UObject
 {
 	GENERATED_BODY()
 public:
-	virtual void Construct();
-	virtual void BeginPlay();
-	virtual void Tick(float DeltaTime);
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-
+	virtual void					Construct				();
+	virtual void					BeginPlay				();
+	virtual void					Tick					(float DeltaTime);
+	virtual void					PostEditChangeProperty	(FPropertyChangedEvent& PropertyChangedEvent) override;
+			ALegacyKismet*			GetOwnerKismetChecked	();
+			const ALegacyKismet*	GetOwnerKismetChecked	() const;
 	UPROPERTY()
 	TMap<FName,FName> InitializeDelegates;
 	
@@ -132,4 +133,14 @@ public:
 	
 	UPROPERTY()
 	TMap<FName,FSequenceActionPropertyArrayReference> PropertiesArrayReference;
+};
+
+
+UCLASS()
+class REDUELEGACYGAME_API USequenceEvent : public USequenceAction
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadWrite,EditAnywhere,Category="Event")
+	bool bEnabled = true;
 };

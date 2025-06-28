@@ -1,6 +1,7 @@
 ﻿#include "World/LegacyLevel.h"
 
 #include "Editor.h"
+#include "Actors/XMatineeCameraActor.h"
 #include "Core/LegacyPackage.h"
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacySubsystem.h"
@@ -51,7 +52,12 @@ void ULegacyLevel::ImportLevel(bool ReimportKismet)
                 AActor* Me =  CastChecked<AActor>(Actor->PresentObject,ECastCheckedType::NullAllowed);
                 if (Parent && Me)
                 {
-                    Me->AttachToActor(Parent,FAttachmentTransformRules::KeepWorldTransform);
+                    FName SocketName = NAME_None;
+                    if (Parent->IsA<AXMatineeCameraActor>())
+                    {
+                        SocketName = "CameraDirect";
+                    }
+                    Me->AttachToActor(Parent,FAttachmentTransformRules::KeepWorldTransform,SocketName);
                 }
             }
         }

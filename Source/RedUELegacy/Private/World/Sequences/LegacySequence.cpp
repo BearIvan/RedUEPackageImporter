@@ -38,29 +38,14 @@ UObject* ULegacySequence::ImportKismet(bool Reimport)
 		}
 		
 		// otherwise delete and replace
-		if (!ObjectTools::DeleteSingleObject(ExistingAsset))
+		if ( ObjectTools::ForceDeleteObjects({ExistingAsset},false) != 1)
 		{
 			UE_LOG(LogRedUELegacy, Warning, TEXT("Could not delete existing asset %s"), *ExistingAsset->GetFullName());
 			OutNewObject = nullptr;
 			return false;
 		}
 
-		// keep InPackage alive through the GC, in case ExistingAsset was the only reason it was around
-		const bool bRootedPackage = InParent->IsRooted();
-
-		if (!bRootedPackage)
-		{
-			InParent->AddToRoot();
-		}
-
-		// force GC so we can cleanly create a new asset (and not do an 'in place' replacement)
-		CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
-
-		if (!bRootedPackage)
-		{
-			InParent->RemoveFromRoot();
-		}
-
+		InParent = CreatePackage(*Path);
 		// try to find the existing asset again now that the GC has occurred
 		ExistingAsset = StaticFindObject(nullptr, InParent, *InName.ToString());
 
@@ -70,7 +55,7 @@ UObject* ULegacySequence::ImportKismet(bool Reimport)
 			OutNewObject = nullptr;
 			return false;
 		}
-
+		InParent = CreatePackage(*Path);
 		// create the asset in the package
 		OutNewObject = FKismetEditorUtilities::CreateBlueprint(ParentClass, InParent,  * FPaths::GetBaseFilename(*Path), BPTYPE_Normal, ULegacyKismetBlueprint::StaticClass(), ULegacyKismetGeneratedClass::StaticClass(), NAME_None);
 		ensure(OutNewObject);
@@ -139,28 +124,31 @@ void ULegacySequence::GenerateBlueprint(ULegacyKismetBlueprint* InBlueprint,UEdG
 			SequenceEvent->ExportToBlueprint(InBlueprint,EventGraph);
 		}
 	}
-	
+
 	float X = 0;
 	float Y = 0;
+	TSet<class UEdGraphNode*> LinkedNodes;
 	TSet<class UEdGraphNode*> SortedNodes;
 	for (UEdGraphNode* Node : EventGraph->Nodes)
 	{
-		bool bContinue = false;
-		for (UEdGraphPin*Pin: Node->Pins)
-		{
-			if (Pin->Direction == EGPD_Input&&Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec&&Pin->LinkedTo.Num()>0)
-			{
-				bContinue = true;
-			}
-		}
-		if (bContinue)
-		{
-			continue;
-		}
+		GetLinkedNodes(Node,LinkedNodes);
 		
-		if (SortNode(Node,SortedNodes,Y,X))
+		for (UEdGraphNode* LinkNode : LinkedNodes)
 		{
-			Y+=300;
+			bool bContinue = false;
+			for (UEdGraphPin*Pin: LinkNode->Pins)
+			{
+				if (Pin->Direction == EGPD_Input&&Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec&&Pin->LinkedTo.Num()>0)
+				{
+					bContinue = true;
+				}
+			}
+			if (bContinue)
+			{
+				continue;
+			}
+		
+			SortNode(LinkNode,SortedNodes,Y,X);
 		}
 	}
 }
@@ -177,15 +165,39 @@ bool ULegacySequence::SortNode(class UEdGraphNode* Start, TSet<class UEdGraphNod
 	Nodes.Add(Start);
 	Start->NodePosX = X;
 	Start->NodePosY = Y;
+	float LocalY = Y;
 	for (UEdGraphPin*Pin: Start->Pins)
 	{
 		if (Pin->Direction == EGPD_Output&&Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec&&Pin->LinkedTo.Num()>0)
 		{
-			if(SortNode(Pin->LinkedTo[0]->GetOwningNode(), Nodes, Y, X + 300))
-				Y += 300;
+			SortNode(Pin->LinkedTo[0]->GetOwningNode(), Nodes, LocalY, X + 500);
 		}
 	}
+	Y = FMath::Max(Y + 300, LocalY);
 	return true;
+}
+
+void ULegacySequence::GetLinkedNodes(class UEdGraphNode* Start, TSet<class UEdGraphNode*>& LinkedNodes)
+{
+	if (!Start)
+	{
+		return;
+	}
+	if (LinkedNodes.Contains(Start))
+	{
+		return;
+	}
+	LinkedNodes.Add(Start);
+	for (UEdGraphPin*Pin: Start->Pins)
+	{
+		if (Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec&&Pin->LinkedTo.Num()>0)
+		{
+			for (UEdGraphPin* Item :Pin->LinkedTo)
+			{
+				GetLinkedNodes(Item->GetOwningNode(), LinkedNodes);
+			}
+		}
+	}
 }
 
 ULegacySequenceVariable* ULegacySequence::FindSequenceVariable(FName InName)

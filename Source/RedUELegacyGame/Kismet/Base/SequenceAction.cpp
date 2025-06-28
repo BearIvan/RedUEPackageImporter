@@ -76,3 +76,17 @@ void USequenceAction::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 
 	
 }
+
+ALegacyKismet* USequenceAction::GetOwnerKismetChecked()
+{
+	ALegacyKismet* Kismet = GetTypedOuter<ALegacyKismet>();
+	check(Kismet);
+	return Kismet;
+}
+
+const ALegacyKismet* USequenceAction::GetOwnerKismetChecked() const
+{
+	ALegacyKismet* Kismet = GetTypedOuter<ALegacyKismet>();
+	check(Kismet);
+	return Kismet;
+}
