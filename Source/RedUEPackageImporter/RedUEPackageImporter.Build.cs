@@ -10,20 +10,6 @@ public class RedUEPackageImporter : ModuleRules
 		PrivatePCHHeaderFile = "Private/RedUEPackageImporterPCH.h";
 
 
-		PublicIncludePaths.AddRange(
-			new string[] {
-				"Public"
-			}
-			);
-				
-		
-		PrivateIncludePaths.AddRange(
-			new string[] {
-				"Private"
-			}
-			);
-			
-		
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{

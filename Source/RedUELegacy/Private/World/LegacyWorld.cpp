@@ -4,12 +4,15 @@
 #include "EditorLevelUtils.h"
 #include "FileHelpers.h"
 #include "LevelUtils.h"
+#include "Selection.h"
 #include "UnrealEdGlobals.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/LegacyPackage.h"
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacySubsystem.h"
 #include "Editor/UnrealEdEngine.h"
+#include "Engine/LevelStreaming.h"
+#include "Engine/LevelStreamingAlwaysLoaded.h"
 
 void ULegacyWorld::LegacySerialize(FRedUELegacyArchive& Ar)
 {
@@ -187,7 +190,7 @@ void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, 
 									}
 
 									LegacyWorld->ImportLevel(ReimportKismet);
-									FAssetRegistryModule::AssetSaved(*Level);
+									//FAssetRegistryModule::AssetsSaved({*Level});
 
 									bool AllMovable = false;
 

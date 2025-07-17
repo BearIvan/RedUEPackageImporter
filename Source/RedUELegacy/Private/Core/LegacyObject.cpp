@@ -27,16 +27,18 @@ FLegacyRotator& FLegacyRotator::operator=(const FRotator3f& Rotator)
 
 bool FLegacyMatrix::Serialize(FArchive& Ar)
 {
-	FPlane4f PlaneX;
-	Ar<<PlaneX[3]<<PlaneX[0]<<PlaneX[1]<<PlaneX[2];
-	FPlane4f PlaneY;
-	Ar<<PlaneY[3]<<PlaneY[0]<<PlaneY[1]<<PlaneY[2];
-	FPlane4f PlaneZ;
-	Ar<<PlaneZ[3]<<PlaneZ[0]<<PlaneZ[1]<<PlaneZ[2];
-	FPlane4f PlaneW;
-	Ar<<PlaneW[3]<<PlaneW[0]<<PlaneW[1]<<PlaneW[2];
-
-	Data = FMatrix44f(PlaneX, PlaneY, PlaneZ, PlaneW);
+	if (Ar.IsLoading()||Ar.IsSaving())
+	{
+		FPlane4f PlaneX = FPlane4f(Data.M[0][0],Data.M[0][1],Data.M[0][2],Data.M[0][3]);
+		Ar<<PlaneX.W<<PlaneX[0]<<PlaneX[1]<<PlaneX[2];
+		FPlane4f PlaneY = FPlane4f(Data.M[1][0],Data.M[1][1],Data.M[1][2],Data.M[1][3]);
+		Ar<<PlaneY.W<<PlaneY[0]<<PlaneY[1]<<PlaneY[2];
+		FPlane4f PlaneZ = FPlane4f(Data.M[2][0],Data.M[2][1],Data.M[2][2],Data.M[2][3]);
+		Ar<<PlaneZ.W<<PlaneZ[0]<<PlaneZ[1]<<PlaneZ[2];
+		FPlane4f PlaneW = FPlane4f(Data.M[3][0],Data.M[3][1],Data.M[3][2],Data.M[3][3]);
+		Ar<<PlaneW.W<<PlaneW[0]<<PlaneW[1]<<PlaneW[2];
+		Data = FMatrix44f(PlaneX, PlaneY, PlaneZ, PlaneW);
+	}
 	return true;
 }
 

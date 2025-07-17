@@ -9,22 +9,6 @@ public class RedUELegacy : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PrivatePCHHeaderFile = "Private/RedUELegacyPCH.h";
 
-		PublicIncludePaths.AddRange(
-			new string[]
-			{
-				"Public"
-			}
-		);
-
-
-		PrivateIncludePaths.AddRange(
-			new string[]
-			{
-				"Private"
-			}
-		);
-
-
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{

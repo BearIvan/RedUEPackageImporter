@@ -413,3 +413,9 @@ void FRedUELegacyArchiveFileHandle::Decompress(FArchive& Ar, uint8* Buffer, int3
 		Buffer += Block->UncompressedSize;
 	}
 }
+
+bool FRedUELegacyArchiveFileHandle::ReadAt(uint8* Destination, int64 BytesToRead, int64 Offset)
+{
+	Seek(Offset);
+	return Read(Destination, BytesToRead);
+}

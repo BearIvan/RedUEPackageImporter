@@ -36,6 +36,7 @@ public:
     void PrepareBuffer(int64 Position);
     static void Decompress(const uint8 *CompressedBuffer, int CompressedSize, uint8 *UncompressedBuffer, int32 UncompressedSize, int32 Flags);
     static void Decompress(FArchive& Ar, uint8* Buffer, int32 Size, int32 Flags);
+    virtual bool ReadAt(uint8* Destination, int64 BytesToRead, int64 Offset) override;
     int32								CompressionFlags;
     TArray<FRedUELegacyCompressedChunk>	CompressedChunks;
     IFileHandle*                        FileHandle = nullptr;
