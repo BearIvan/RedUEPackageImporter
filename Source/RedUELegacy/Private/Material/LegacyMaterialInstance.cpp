@@ -204,7 +204,6 @@ UObject* ULegacyMaterialInstance::ExportToContent()
 		Material->PostEditChange();
 		Material->Modify();
 		HybridMaterial->InitializeMID(HybridMaterial->Parent);
-		HybridMaterial->UpdateStaticPermutation();
 		HybridMaterial->PostEditChange();
 		HybridMaterial->Modify();
 		MaterialResult = HybridMaterial;

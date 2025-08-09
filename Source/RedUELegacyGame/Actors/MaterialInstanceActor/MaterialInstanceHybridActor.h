@@ -11,7 +11,7 @@ public:
 	AMaterialInstanceHybridActor();
 	
 	UPROPERTY(EditInstanceOnly,Interp,Category = "Legacy|MaterialInstance",BlueprintReadWrite)
-	UMaterialInstanceHybrid* MaterialInstance;
+	class UMaterialInstanceHybrid* MaterialInstance;
 
 	
 };

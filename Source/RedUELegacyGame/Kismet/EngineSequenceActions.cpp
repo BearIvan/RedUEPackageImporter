@@ -4,6 +4,16 @@
 
 void USeqAct_SetMaterial::In()
 {
+	TArray<AActor*> InActors = GetActors();
+	for (AActor* Actor : InActors)
+	{
+		TArray<UPrimitiveComponent*> PrimitiveComponents;
+		Actor->GetComponents(PrimitiveComponents);
+		for (UPrimitiveComponent* PrimitiveComponent : PrimitiveComponents)
+		{
+			PrimitiveComponent->SetMaterial(MaterialIndex,NewMaterial);
+		}
+	}
 	Out.Broadcast();
 }
 
@@ -122,11 +132,25 @@ void UXSeqAct_PlayEffect::Stop()
 
 void UXSeqAct_PlaySound::Play()
 {
+	TArray<AActor*> InActors = GetActors();
+	if (InActors.Num()  == 0)
+	{
+		UGameplayStatics::SpawnSound2D(GetWorld(),PlaySound);
+	}
+	for (AActor* Actor : InActors)
+	{
+		if (!Actor)
+		{
+			continue;
+		}
+		UGameplayStatics::SpawnSoundAttached(PlaySound,Actor->GetRootComponent());
+	}
 	Out.Broadcast();
 }
 
 void UXSeqAct_PlaySound::Stop()
 {
+	Stopped.Broadcast();
 }
 
 void USeqAct_SetPhysics::In()

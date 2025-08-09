@@ -22,6 +22,7 @@ class REDUELEGACY_API USingularityTextureFileCache : public UObject
 	GENERATED_BODY()
 public:
 	FSingularityTextureFileCacheInfo*				Get				(const FGuid&Guid);
+	void											Empty			();
 private:			
 	void											Load			();
 	bool											bFailed = false;

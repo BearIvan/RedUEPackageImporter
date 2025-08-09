@@ -49,7 +49,12 @@ public class RedUELegacy : ModuleRules
 				"MovieSceneTracks",
 				"MovieSceneTools",
 				"GraphEditor",
-				"ToolMenus"
+				"ToolMenus",
+				"WW2OGG",
+				"UEOgg",
+				"Vorbis",
+				"VorbisFile",
+				"AudioEditor"
 			}
 		);
 	}

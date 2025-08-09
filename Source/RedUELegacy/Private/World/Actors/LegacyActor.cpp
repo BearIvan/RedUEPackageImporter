@@ -95,6 +95,19 @@ UClass* ULegacyXFloatingSection::GetActorClass_Implementation()
 	return AXFloatingSection::StaticClass();
 }
 
+UClass* ULegacyEmitter::GetActorClass_Implementation()
+{
+	return AEmitter::StaticClass();
+}
+
+void ULegacyEmitter::FillActor_Implementation(AActor* InActor)
+{
+	if (AEmitter* InEmitter = CastChecked<AEmitter>(InActor))
+	{
+		ParticleSystemComponent->FillComponent(InEmitter->GetParticleSystemComponent());
+	}
+}
+
 void ULegacyActor::FillActor_Implementation(AActor* InActor)
 {
 }

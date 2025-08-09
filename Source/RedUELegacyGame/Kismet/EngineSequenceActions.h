@@ -16,8 +16,13 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Actors;
 	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Actors);
+	
+	UPROPERTY(EditAnywhere)
+	UMaterialInterface* NewMaterial;
+	
+	UPROPERTY(EditAnywhere)
+	int32 MaterialIndex = 0;
 };
-
 
 
 UCLASS()
@@ -161,6 +166,13 @@ public:
 	TArray<AActor*> Actors;
 
 	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Actors);
+	
+	UPROPERTY(EditAnywhere)
+	USoundBase* PlaySound;
+	
+	UPROPERTY(EditAnywhere)
+	USoundBase* StopSound;
+	
 };
 
 

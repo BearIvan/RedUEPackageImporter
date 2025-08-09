@@ -83,8 +83,106 @@ UObject* ULegacyTexture2D::ExportToContent()
     	Texture2D = NewObject<UTexture2D>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
     	Texture2D->PreEditChange(nullptr);
     	FAssetRegistryModule::AssetCreated(Texture2D);
-    	
-    	Texture2D->LODGroup = LODGroup;
+
+	    switch (LODGroup)
+	    {
+	    case ELegacyTextureGroup::TEXTUREGROUP_World:
+	    	Texture2D->LODGroup = TEXTUREGROUP_World;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_WorldNormalMap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_WorldNormalMap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_WorldSpecularColor:
+	    case ELegacyTextureGroup::TEXTUREGROUP_WorldSpecular:
+	    	Texture2D->LODGroup = TEXTUREGROUP_WorldSpecular;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Character:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Character;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_CharacterNormalMap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_CharacterNormalMap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_CharacterSpecularColor:
+	    case ELegacyTextureGroup::TEXTUREGROUP_CharacterSpecular:
+	    	Texture2D->LODGroup = TEXTUREGROUP_CharacterSpecular;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Weapon:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Weapon;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_WeaponNormalMap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_WeaponNormalMap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_WeaponSpecular:
+	    	Texture2D->LODGroup = TEXTUREGROUP_WeaponSpecular;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Vehicle:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Vehicle;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_VehicleNormalMap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_VehicleNormalMap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_VehicleSpecular:
+	    	Texture2D->LODGroup = TEXTUREGROUP_VehicleSpecular;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Cinematic:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Cinematic;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Effects:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Effects;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_EffectsNotFiltered:
+	    	Texture2D->LODGroup = TEXTUREGROUP_EffectsNotFiltered;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Skybox:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Skybox;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_UI:
+	    	Texture2D->LODGroup = TEXTUREGROUP_UI;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Lightmap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Lightmap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_RenderTarget:
+	    	Texture2D->LODGroup = TEXTUREGROUP_RenderTarget;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_MobileFlattened:
+	    	Texture2D->LODGroup = TEXTUREGROUP_MobileFlattened;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_ProcBuilding_Face:
+	    	Texture2D->LODGroup = TEXTUREGROUP_ProcBuilding_Face;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_ProcBuilding_LightMap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_ProcBuilding_LightMap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Shadowmap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Shadowmap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_ColorLookupTable:
+	    	Texture2D->LODGroup = TEXTUREGROUP_ColorLookupTable;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Terrain_Heightmap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Terrain_Heightmap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Terrain_Weightmap:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Terrain_Weightmap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_ImageBasedReflection:
+	    	Texture2D->LODGroup = TEXTUREGROUP_RenderTarget;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Bokeh:
+	    	Texture2D->LODGroup = TEXTUREGROUP_Bokeh;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_WorldGroundNormal:
+	    	Texture2D->LODGroup = TEXTUREGROUP_WorldNormalMap;
+		    break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_WorldGround:
+	    	Texture2D->LODGroup = TEXTUREGROUP_World;
+	    	break;
+	    case ELegacyTextureGroup::TEXTUREGROUP_Gobo:
+	    	Texture2D->LODGroup = TEXTUREGROUP_World;
+	    	break;
+	    default: ;
+	    }
     	if (Texture2D->LODGroup == TEXTUREGROUP_WorldNormalMap)
     	{
     		Texture2D->CompressionSettings = TC_Normalmap;
@@ -147,12 +245,21 @@ void ULegacyTexture2D::ExportTo(RedImageTool::RedImage& Image,bool*IsHDR)
 						size_t MipHeight = RedImageTool::RedTextureUtils::GetMip(Image.GetHeight(), i);
 						for (size_t x = 0; x<MipWidth*MipHeight; x++)
 						{
+							Pixels[x].X = Pixels[x].X*2 - 1.f;
+							Pixels[x].Y = Pixels[x].Y*2 - 1.f;
 							Pixels[x].Z = FMath::Sqrt(FMath::Max(1.f - 	Pixels[x].X*	Pixels[x].X-	Pixels[x].Y*	Pixels[x].Y,0.f));
+							Pixels[x] = Pixels[x].GetSafeNormal();
+							
+							Pixels[x].X = Pixels[x].X + 1.f;
+							Pixels[x].Y = Pixels[x].Y + 1.f;
+							Pixels[x].Z = Pixels[x].Z + 1.f;
+							Pixels[x] *= 0.5f;
 						}
-						Pixels+=MipWidth*MipHeight;
+						Pixels += MipWidth*MipHeight;
 					}
 				}
 				Image.Convert(RedImageTool::RedTexturePixelFormat::R8G8B8A8);
+				Image.SwapRB();
 			}
 			break;
 	}
@@ -163,20 +270,7 @@ void ULegacyTexture2D::ExportTo(RedImageTool::RedImage& Image,bool*IsHDR)
 	else
 	{
 		Image.Convert(RedImageTool::RedTexturePixelFormat::R8G8B8A8);
-		FColor* Pixels = static_cast<FColor*>(*Image);
-		for (size_t d = 0; d < Image.GetDepth(); d++)
-		{
-			for (size_t i = 0; i < Image.GetMips(); i++)
-			{
-				size_t MipWidth = RedImageTool::RedTextureUtils::GetMip(Image.GetWidth(), i);
-				size_t MipHeight = RedImageTool::RedTextureUtils::GetMip(Image.GetHeight(), i);
-				for (size_t x = 0; x<MipWidth*MipHeight; x++)
-				{
-					Swap(Pixels[x].B,Pixels[x].R);
-				}
-				Pixels+=MipWidth*MipHeight;
-			}
-		}
+		Image.SwapRB();
 	}
 }
 

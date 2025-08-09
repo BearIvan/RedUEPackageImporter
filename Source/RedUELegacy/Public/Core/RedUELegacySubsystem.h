@@ -60,6 +60,9 @@ public:
 
 	UPROPERTY(Transient)
 	class USingularityTextureFileCache* SingularityTextureFileCache = nullptr;
+
+	UPROPERTY(Transient)
+	class UWWiseBanksManager* WWiseBanksManager = nullptr;
 	
 	UPROPERTY(Transient,BlueprintReadWrite)
 	TArray<FString> InContentPaths;

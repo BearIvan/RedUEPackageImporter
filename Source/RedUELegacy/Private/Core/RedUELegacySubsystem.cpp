@@ -12,6 +12,7 @@
 #include "Core/LegacyPackage.h"
 #include "Kismet/Base/SequenceAction.h"
 #include "Material/SingularityTextureFileCache.h"
+#include "Sounds/WWiseBanksManager.h"
 #include "World/LegacyWorld.h"
 #include "World/Sequences/Object/LegacySequenceObjects.h"
 DEFINE_LOG_CATEGORY(LogRedUELegacy);
@@ -19,6 +20,7 @@ DEFINE_LOG_CATEGORY(LogRedUELegacy);
 URedUELegacySubsystem::URedUELegacySubsystem()
 {
     SingularityTextureFileCache = CreateDefaultSubobject<USingularityTextureFileCache>("SingularityTextureFileCache");
+    WWiseBanksManager = CreateDefaultSubobject<UWWiseBanksManager>("WWiseBanksManager");
     OutContentPath = TEXT("/Game");
 }
 
@@ -245,6 +247,8 @@ void URedUELegacySubsystem::Clear()
     SequenceActionClasses.Empty();
     CacheNoFoundClasses.Empty();
     Skeletons.Empty();
+    WWiseBanksManager->Empty();
+    SingularityTextureFileCache->Empty();
     CurrentEngineType = ERedUELegacyEngineType::Unkown;
     CurrentGameType = ERedUELegacyGameType::Unkown;
     FloatingSectionIndexTable = nullptr;

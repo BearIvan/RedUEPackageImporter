@@ -238,11 +238,16 @@ class REDUELEGACY_API ULegacySequenceImporter : public ULegacySequenceOp
 {
 	GENERATED_BODY()
 public:
+	virtual void					FillAction						(class USequenceAction* InSequenceAction);
 	virtual UK2Node_SequenceAction* ExportToBlueprint				(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	virtual void					PreLegacySerializeUnrealProps	(FRedUELegacyArchive& Ar);
 			void					FillPin							(UBlueprint* InBlueprint, UEdGraph* InGraph, const FLegacySeqOpOutputLink& LegacySeqOpOutputLink, UEdGraphPin* OutputPin);
+
 	UPROPERTY(Transient)
 	class USequenceAction* ToAction = nullptr;
+
+
+	bool bNeedSerializeToActon = true;
 };
 
 
@@ -479,6 +484,34 @@ public:
 	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 };
 
+UCLASS()
+class REDUELEGACY_API ULegacySeqAct_SetMaterial : public ULegacySequenceImporter
+{
+	GENERATED_BODY()
+public:
+									ULegacySeqAct_SetMaterial	();
+	virtual void					FillAction					(USequenceAction* InSequenceAction) override;
+	UPROPERTY(BlueprintReadWrite)
+	ULegacyObject* NewMaterial;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 MaterialIndex = 0;
+
+};
+
+
+UCLASS()
+class REDUELEGACY_API ULegacyXSeqAct_PlaySound : public ULegacySequenceImporter
+{
+	GENERATED_BODY()
+public:
+									ULegacyXSeqAct_PlaySound	();
+	virtual void					FillAction					(USequenceAction* InSequenceAction) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	class ULegacyXEffectSound* PlaySound;
+};
+
 
 UCLASS()
 class REDUELEGACY_API  ULegacyInterpTrack: public ULegacyObject
@@ -512,6 +545,39 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	TArray<FLegacyEventTrackKey> EventTrack;
 };
+UENUM()
+enum class ETrackToggleAction
+{
+	ETTA_Off,
+	ETTA_On,
+	ETTA_Toggle,
+	ETTA_Trigger
+};
+
+
+USTRUCT(BlueprintType)
+struct FLegacyToggleTrackKey
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	float Time = 0;
+	
+	UPROPERTY(BlueprintReadWrite)
+	ETrackToggleAction ToggleAction = ETrackToggleAction::ETTA_Off;
+};
+
+UCLASS()
+class REDUELEGACY_API  ULegacyInterpTrackToggle: public ULegacyInterpTrack
+{
+public:
+	GENERATED_BODY()
+	
+	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FLegacyToggleTrackKey> ToggleTrack;
+};
 
 UENUM()
 enum class EVisibilityTrackAction
@@ -520,6 +586,7 @@ enum class EVisibilityTrackAction
 	EVTA_Show,
 	EVTA_Toggle
 };
+
 
 USTRUCT(BlueprintType)
 struct FLegacyVisibilityTrackKey
@@ -650,6 +717,7 @@ public:
 	
 };
 
+
 UCLASS()
 class ULegacyInterpTrackFloatMaterialParam : public ULegacyInterpTrack
 {
@@ -664,6 +732,49 @@ public:
 	
 	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
 };
+
+UCLASS()
+class ULegacyInterpTrackFloatParticleParam : public ULegacyInterpTrack
+{
+public:
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName ParamName;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FInterpCurveFloat FloatTrack;
+	
+	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
+};
+
+
+USTRUCT(Blueprintable)
+struct FLegacyXAKEventTrackKey
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	float Time = 0.0f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	class ULegacyXAKAudioEventID* Event;
+
+};
+
+
+UCLASS()
+class ULegacyXAKInterpTrackPostEvent : public ULegacyInterpTrack
+{
+public:
+	GENERATED_BODY()
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<FLegacyXAKEventTrackKey> AKEvents;
+	
+	virtual void ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer,ULegacyActor* LegacyAction) override;
+};
+
 
 UCLASS()
 class REDUELEGACY_API ULegacyInterpGroup : public ULegacyObject
@@ -695,20 +806,34 @@ public:
 			ULevelSequence*				GetOrCreateLevel		();
 			void						ExportToLevelSequence	(ULegacySeqAct_Interp* OwnerSeqAction ,ULevelSequence* LevelSequence);
 			FGuid						FindOrCreateBinding		(AActor& ActorToBind,const FString&NameBinding);
+	
 			FGuid						FindOrCreateBinding		(USceneComponent& ComponentToBind,const FString&NameBinding);
 			template<typename T>
-			T*							FindOrCreateTrack		(FGuid ObjectGuid)
+			T*							FindOrCreateTrack		(FGuid ObjectGuid, const FName& TrackName = NAME_None)
 			{
 				UMovieScene* MovieScene = LevelSequence->GetMovieScene();
 				if (!MovieScene)
 				{
 					return nullptr;
 				}
-				if (T*Result =  MovieScene->FindTrack<T>(ObjectGuid))
+				if (ObjectGuid.IsValid())
 				{
-					return Result;
+					if (T*Result =  MovieScene->FindTrack<T>(ObjectGuid,TrackName))
+					{
+						return Result;
+					}
 				}
 				return MovieScene->AddTrack<T>(ObjectGuid);
+			}
+			template<typename T>
+			T*							CreateTrack		()
+			{
+				UMovieScene* MovieScene = LevelSequence->GetMovieScene();
+				if (!MovieScene)
+				{
+					return nullptr;
+				}
+				return MovieScene->AddTrack<T>();
 			}
 	
 	UPROPERTY(BlueprintReadWrite)

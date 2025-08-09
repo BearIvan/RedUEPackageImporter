@@ -227,7 +227,14 @@ UObject* ULegacyStaticMesh3::ExportToContent()
                             {
                                 VertexInstanceBinormalSigns[VertexInstanceIDs[VertexID]] =  1.f;
                             }
-					        VertexInstanceColors[VertexInstanceIDs[VertexID]] = FLinearColor(Lods[LodIndex].UVStream.UV[Indices[FaceID * 3 + VertexID]].Color);
+					    	if(Lods[LodIndex].ColorStream.Colors.Num() > 0)
+					    	{
+					    		VertexInstanceColors[VertexInstanceIDs[VertexID]] = FLinearColor(Lods[LodIndex].ColorStream.Colors[Indices[FaceID * 3 + VertexID]]);
+					    	}
+					    	else
+					    	{	
+					    		VertexInstanceColors[VertexInstanceIDs[VertexID]] = FLinearColor(Lods[LodIndex].UVStream.UV[Indices[FaceID * 3 + VertexID]].Color);
+					    	}
 					    }
 					    
 						TArray<FEdgeID> NewEdgeIDs;

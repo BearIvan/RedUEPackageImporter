@@ -1,4 +1,4 @@
-﻿#include "World/Actors/Light/LegacyLight.h"
+﻿#include "World/Actors/LegacyLight.h"
 #include "World/Components/LegacyLightComponent.h"
 
 void ULegacyLight::FillActor_Implementation(AActor* InActor)

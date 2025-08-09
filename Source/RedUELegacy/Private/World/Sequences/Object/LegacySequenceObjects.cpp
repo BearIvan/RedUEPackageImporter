@@ -37,10 +37,16 @@
 #include "Materials/Hybrid/MovieSceneHybridMaterialTrack.h"
 #include "Mesh/LegacyAnimSequence.h"
 #include "Mesh/LegacyAnimSet.h"
+#include "Sections/MovieSceneAudioSection.h"
 #include "Sections/MovieSceneEventTriggerSection.h"
+#include "Sections/MovieSceneParticleSection.h"
 #include "Sections/MovieSceneVisibilitySection.h"
+#include "Sounds/LegacyXSound.h"
 #include "Tracks/MovieScene3DTransformTrack.h"
+#include "Tracks/MovieSceneAudioTrack.h"
 #include "Tracks/MovieSceneEventTrack.h"
+#include "Tracks/MovieSceneParticleParameterTrack.h"
+#include "Tracks/MovieSceneParticleTrack.h"
 #include "Tracks/MovieSceneSkeletalAnimationTrack.h"
 #include "Tracks/MovieSceneVisibilityTrack.h"
 #include "World/LegacyWorld.h"
@@ -130,6 +136,10 @@ void ULegacySequenceImporter::FillPin(UBlueprint* InBlueprint, UEdGraph* InGraph
 	}
 }
 
+void ULegacySequenceImporter::FillAction(USequenceAction* InSequenceAction)
+{
+}
+
 UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	if (CurrentNode)
@@ -139,7 +149,9 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 
 	FGraphNodeCreator<UK2Node_SequenceAction> NodeCreator(*InGraph);
 	UK2Node_SequenceAction* NewNode = NodeCreator.CreateNode();
+
 	NewNode->Action = NewObject<USequenceAction>(NewNode,ToAction->GetClass(),NAME_None,RF_Transactional,ToAction);
+	FillAction(NewNode->Action);
 	NewNode->bCommentBubblePinned = true;
 	NewNode->OnUpdateCommentText(GetLegacyFullName());
 	
@@ -257,10 +269,13 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 void ULegacySequenceImporter::PreLegacySerializeUnrealProps(FRedUELegacyArchive& Ar)
 {
 	Super::PreLegacySerializeUnrealProps(Ar);
-	
-	int32 Tell = Ar.Tell();
-	LegacySerializeUnrealProps(ToAction->GetClass(),ToAction,Ar);
-	Ar.Seek(Tell);
+	if (bNeedSerializeToActon)
+	{
+		int32 Tell = Ar.Tell();
+		LegacySerializeUnrealProps(ToAction->GetClass(),ToAction,Ar);
+		Ar.Seek(Tell);
+	}
+
 }
 
 
@@ -611,7 +626,7 @@ void ULegacySeqAct_Interp::SimulatedImport()
 
 ULegacyXSeqAct_InstancePattern::ULegacyXSeqAct_InstancePattern()
 {
-	ToAction = CreateDefaultSubobject<UXSeqAct_InstancePattern>("yXSeqAct_InstancePattern");
+	ToAction = CreateDefaultSubobject<UXSeqAct_InstancePattern>("XSeqAct_InstancePattern");
 }
 
 UK2Node_SequenceAction* ULegacyXSeqAct_InstancePattern::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
@@ -659,19 +674,50 @@ UEdGraphPin* ULegacyXSeqAct_InstancePattern::GetInputPin(int32 Index, UBlueprint
 	return Super::GetInputPin(Index, InBlueprint, InGraph);
 }
 
+ULegacySeqAct_SetMaterial::ULegacySeqAct_SetMaterial()
+{
+	ToAction = CreateDefaultSubobject<USeqAct_SetMaterial>("SeqAct_SetMaterial");
+	bNeedSerializeToActon = false;
+}
+
+void ULegacySeqAct_SetMaterial::FillAction(USequenceAction* InSequenceAction)
+{
+	Super::FillAction(InSequenceAction);
+	USeqAct_SetMaterial* InSeqAct_SetMaterial = CastChecked<USeqAct_SetMaterial>(InSequenceAction);
+	if (NewMaterial)
+	{
+		InSeqAct_SetMaterial->NewMaterial = Cast<UMaterialInterface>(NewMaterial->ExportToContent());
+	}
+	InSeqAct_SetMaterial->MaterialIndex = MaterialIndex;
+}
+
+ULegacyXSeqAct_PlaySound::ULegacyXSeqAct_PlaySound()
+{
+	ToAction = CreateDefaultSubobject<UXSeqAct_PlaySound>("XSeqAct_PlaySound");
+	bNeedSerializeToActon = false;
+}
+
+void ULegacyXSeqAct_PlaySound::FillAction(USequenceAction* InSequenceAction)
+{
+	Super::FillAction(InSequenceAction);
+	UXSeqAct_PlaySound* InSeqAct_PlaySound = CastChecked<UXSeqAct_PlaySound>(InSequenceAction);
+	if (PlaySound && PlaySound->PlayEvent)
+	{
+		InSeqAct_PlaySound->PlaySound = Cast<USoundBase>(PlaySound->PlayEvent->ExportToContent());
+	}
+	if (PlaySound && PlaySound->StopEvent)
+	{
+		InSeqAct_PlaySound->StopSound = Cast<USoundBase>(PlaySound->StopEvent->ExportToContent());
+	}
+}
+
 
 void ULegacyInterpTrack::ExportToLevelSequence( const TSharedRef<ISequencer>&Sequencer, ULegacyActor* LegacyAction)
 {
 }
 
 void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
-{
-	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
-	if (!Actor)
-	{
-		return;
-	}
-	
+{	
 	ULegacyInterpGroup* InterpGroup = GetTypedOuter<ULegacyInterpGroup>();
 	if (!ensure(InterpGroup))
 	{
@@ -683,10 +729,9 @@ void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>
 	{
 		return;
 	}
-	
-	
 	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*InterpData->CurrentKismet,InterpGroup->GroupName.ToString());
-	UMovieSceneEventTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneEventTrack>(ObjectGuid);
+	UMovieSceneEventTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneEventTrack>(ObjectGuid, *InterpGroup->GroupName.ToString());
+	Track->SetDisplayName(FText::FromString(InterpGroup->GroupName.ToString()));
 	UMovieSceneEventTriggerSection* Section = CastChecked<UMovieSceneEventTriggerSection>(Track->CreateNewSection());
 	Track->AddSection(*Section);
 	
@@ -761,8 +806,109 @@ void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>
 	
 }
 
+void ULegacyInterpTrackToggle::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
+{
+	if (!ensure(LegacyAction))
+	{
+		return;
+	}
+	
+	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
+	if (!Actor)
+	{
+		return;
+	}
+	
+	if (!Actor->GetRootComponent())
+	{
+		return;
+	}
+	
+	ULegacyInterpGroup* InterpGroup = GetTypedOuter<ULegacyInterpGroup>();
+	if (!ensure(InterpGroup))
+	{
+		return;
+	}
+	
+	ULegacyInterpData* InterpData = GetTypedOuter<ULegacyInterpData>();
+	if (!ensure(InterpData))
+	{
+		return;
+	}
+	
+	
+	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*Actor,InterpGroup->GroupName.ToString());
+	UMovieSceneParticleTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneParticleTrack>(ObjectGuid);
+	FName PropertyName =  AActor::GetHiddenPropertyName();
+//	Track->SetPropertyNameAndPath( PropertyName, PropertyName.ToString());
+	UMovieSceneParticleSection* Section =nullptr;
+	{
+		UMovieSceneSection* NewSection = Track->CreateNewSection();
+		ensureAlwaysMsgf(NewSection->HasAnyFlags(RF_Transactional), TEXT("CreateNewSection must return an instance with RF_Transactional set! (pass RF_Transactional to NewObject)"));
+		NewSection->SetFlags(RF_Transactional);
+		Track->AddSection(*NewSection);
+		Section =  CastChecked<UMovieSceneParticleSection>(NewSection);
+	}
+	Section->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
+
+	TMovieSceneChannelData<uint8> Data = Section->ParticleKeys.GetData();
+	Data.Reset();
+	bool LastState = Actor->GetRootComponent()->bAutoActivate;
+
+	if (ToggleTrack.Num() > 0 && !FMath::IsNearlyZero(ToggleTrack[0].Time) )
+	{
+		if (ToggleTrack[0].ToggleAction == ETrackToggleAction::ETTA_Toggle)
+		{
+			ToggleTrack.Insert({0,LastState? ETrackToggleAction::ETTA_Off:ETrackToggleAction::ETTA_On},0);
+		}
+		else if (ToggleTrack[0].ToggleAction == ETrackToggleAction::ETTA_On && !LastState)
+		{
+			ToggleTrack.Insert({0,ETrackToggleAction::ETTA_Off},0);
+		}
+		else if (ToggleTrack[0].ToggleAction == ETrackToggleAction::ETTA_Off && LastState)
+		{
+			ToggleTrack.Insert({0,ETrackToggleAction::ETTA_On},0);
+		}
+	}
+	
+	for (const FLegacyToggleTrackKey& Key :ToggleTrack)
+	{
+		switch (Key.ToggleAction)
+		{
+		case ETrackToggleAction::ETTA_Off:
+			Data.AddKey(Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time),static_cast<uint8>(EParticleKey::Deactivate));
+			LastState = false;
+			break;
+		case ETrackToggleAction::ETTA_On:
+			Data.AddKey(Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time),static_cast<uint8>(EParticleKey::Activate));
+			LastState = true;
+			break;
+		case ETrackToggleAction::ETTA_Toggle:
+			LastState = !LastState;
+			Data.AddKey(Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time),static_cast<uint8>(LastState?EParticleKey::Activate:EParticleKey::Deactivate));
+			break;
+		case ETrackToggleAction::ETTA_Trigger:
+			LastState = !LastState;
+			Data.AddKey(Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time),static_cast<uint8>(EParticleKey::Trigger));
+			break;
+		default: ;
+		}
+	}
+	
+	Section->SetRange(TRange<FFrameNumber>::All());
+	
+
+	
+	Super::ExportToLevelSequence(Sequencer, LegacyAction);
+}
+
 void ULegacyInterpTrackVisibility::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
 {
+	if (!ensure(LegacyAction))
+	{
+		return;
+	}
+	
 	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
 	if (!Actor)
 	{
@@ -839,6 +985,11 @@ void ULegacyInterpTrackVisibility::ExportToLevelSequence(const TSharedRef<ISeque
 
 void ULegacyInterpTrackAnimControl::ExportToLevelSequence(const TSharedRef<ISequencer>&Sequencer, ULegacyActor* LegacyAction)
 {
+	if (!ensure(LegacyAction))
+	{
+		return;
+	}
+	
 	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
 	if (!Actor)
 	{
@@ -900,7 +1051,11 @@ void ULegacyInterpTrackAnimControl::ExportToLevelSequence(const TSharedRef<ISequ
 
 void ULegacyInterpTrackMove::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
 {
-
+	if (!ensure(LegacyAction))
+	{
+		return;
+	}
+	
 	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
 	if (!Actor)
 	{
@@ -1079,6 +1234,11 @@ void ULegacyInterpTrackMove::ExportToLevelSequence(const TSharedRef<ISequencer>&
 
 void ULegacyInterpTrackFloatMaterialParam::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
 {
+	if (!ensure(LegacyAction))
+	{
+		return;
+	}
+	
 	AMaterialInstanceHybridActor * MaterialInstanceHybridActor = Cast<AMaterialInstanceHybridActor>(LegacyAction->PresentObject);
 	if (!MaterialInstanceHybridActor)
 	{
@@ -1182,6 +1342,177 @@ void ULegacyInterpTrackFloatMaterialParam::ExportToLevelSequence(const TSharedRe
 	
 }
 
+void ULegacyInterpTrackFloatParticleParam::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
+{
+	if (!ensure(LegacyAction))
+	{
+		return;
+	}
+	
+	AEmitter * Emitter = Cast<AEmitter>(LegacyAction->PresentObject);
+	if (!Emitter)
+	{
+		return;
+	}
+
+	ULegacyInterpGroup* InterpGroup = GetTypedOuter<ULegacyInterpGroup>();
+	if (!ensure(InterpGroup))
+	{
+		return;
+	}
+	
+	ULegacyInterpData* InterpData = GetTypedOuter<ULegacyInterpData>();
+	if (!ensure(InterpData))
+	{
+		return;
+	}
+
+	FFrameRate FrameRate =  Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->GetTickResolution();
+	
+	auto SetSceneValue = [FrameRate](FMovieSceneFloatValue& InSceneValue,EInterpCurveMode CurveMode,float ArriveTangent,float LeaveTangent)
+	{
+		InSceneValue.InterpMode = RCIM_Cubic;
+		InSceneValue.TangentMode = RCTM_Auto;
+		switch (CurveMode)
+		{
+		case CIM_Linear:
+			InSceneValue.InterpMode = RCIM_Linear;
+			InSceneValue.TangentMode = RCTM_None;
+			break;
+		case CIM_CurveAuto:
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_Auto;
+			break;
+		case CIM_Constant:
+			InSceneValue.InterpMode = RCIM_Constant;
+			InSceneValue.TangentMode = RCTM_None;
+			break;
+		case CIM_CurveUser:
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_User;
+			break;
+		case CIM_CurveBreak:
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_Break;
+			break;
+		case CIM_CurveAutoClamped:
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_Auto;
+			break;
+		default: 
+			InSceneValue.InterpMode = RCIM_Cubic;
+			InSceneValue.TangentMode = RCTM_Auto;
+		}
+		InSceneValue.Tangent.ArriveTangent = ArriveTangent/FrameRate.AsDecimal();
+		InSceneValue.Tangent.LeaveTangent = LeaveTangent/FrameRate.AsDecimal();
+	};
+
+	if (FloatTrack.Points.Num() == 0)
+	{
+		return;
+	}
+	
+	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*Emitter,InterpGroup->GroupName.ToString());
+	UMovieSceneParticleParameterTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneParticleParameterTrack>(ObjectGuid);
+	
+	UMovieSceneParameterSection* Section = CastChecked<UMovieSceneParameterSection>(Track->CreateNewSection());
+
+	if (Section)
+	{
+		Track->Modify();
+		Track->AddSection(*Section);
+	}
+	Section->AddScalarParameterKey(ParamName,Sequencer->GetRootTickResolution().AsFrameNumber(FloatTrack.Points[0].InVal),FloatTrack.Points[0].OutVal);
+
+	
+	FMovieSceneFloatChannel*FloatChannel = nullptr;
+	{
+		for ( FScalarParameterNameAndCurve& ScalarParameterNameAndCurve : Section->GetScalarParameterNamesAndCurves() )
+		{
+			if ( ScalarParameterNameAndCurve.ParameterName == ParamName )
+			{
+				FloatChannel = &ScalarParameterNameAndCurve.ParameterCurve;
+				break;
+			}
+		}
+	}
+	
+	check(FloatChannel);
+	
+	Section->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
+	TArray<FFrameNumber> ScalarFrameNumbers;
+	TArray<FMovieSceneFloatValue> ScalarValues;
+
+	
+	ScalarFrameNumbers.Reserve(FloatTrack.Points.Num());
+	ScalarValues.Reserve(FloatTrack.Points.Num());
+
+	for (const FInterpCurvePoint<float>& Key :FloatTrack.Points)
+	{
+		FFrameNumber Time = Sequencer->GetRootTickResolution().AsFrameNumber(Key.InVal);
+		SetSceneValue(ScalarValues.Emplace_GetRef(Key.OutVal),Key.InterpMode,Key.ArriveTangent,Key.LeaveTangent);
+		ScalarFrameNumbers.Add(Time);
+		
+	}
+	Section->SetRange(TRange<FFrameNumber>::All());
+	FloatChannel->Set(ScalarFrameNumbers,ScalarValues);
+
+	
+}
+
+void ULegacyXAKInterpTrackPostEvent::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
+{
+	if (!ensure(LegacyAction))
+	{
+		return;
+	}
+	
+	AActor * Actor = Cast<AActor>(LegacyAction->PresentObject);
+	if (!Actor)
+	{
+		return;
+	}
+
+	ULegacyInterpGroup* InterpGroup = GetTypedOuter<ULegacyInterpGroup>();
+	if (!ensure(InterpGroup))
+	{
+		return;
+	}
+	
+	ULegacyInterpData* InterpData = GetTypedOuter<ULegacyInterpData>();
+	if (!ensure(InterpData))
+	{
+		return;
+	}
+
+	FFrameRate FrameRate =  Sequencer->GetRootMovieSceneSequence()->GetMovieScene()->GetTickResolution();
+	
+	if (AKEvents.Num() == 0)
+	{
+		return;
+	}
+	
+	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*Actor,InterpGroup->GroupName.ToString());
+	UMovieSceneAudioTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneAudioTrack>(ObjectGuid);
+	
+	for (FLegacyXAKEventTrackKey&Key : AKEvents)
+	{
+		if (Key.Event)
+		{
+			if (USoundBase* Sound = Cast<USoundBase>(Key.Event->ExportToContent()))
+			{
+				FFrameNumber Time = Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time);
+				if (UMovieSceneSection* MovieSceneSection = Track->AddNewSound(Sound,Time))
+				{
+					MovieSceneSection->Modify();
+				}
+			}
+		}
+	}
+	
+
+}
+
 void ULegacyInterpGroup::ExportToLevelSequence(ULegacySeqAct_Interp* OwnerSeqAction, const TSharedRef<ISequencer>&Sequencer)
 {
 	for (FLegacySeqVarLink& VarLink : OwnerSeqAction->VariableLinks)
@@ -1193,31 +1524,18 @@ void ULegacyInterpGroup::ExportToLevelSequence(ULegacySeqAct_Interp* OwnerSeqAct
 		}
 		if (LinkName == GroupName)
 		{
-			for (ULegacySequenceVariable* Variable : VarLink.LinkedVariables)
+			if (VarLink.LinkedVariables.Num() > 0)
 			{
-				ULegacySeqVar_Object* Var_Object = Cast<ULegacySeqVar_Object>(Variable);
-				if (ULegacySeqVar_Named* Var_Named = Cast<ULegacySeqVar_Named>(Variable))
+				for (ULegacySequenceVariable* Variable : VarLink.LinkedVariables)
 				{
-					Var_Object = Cast<ULegacySeqVar_Object>(Var_Named->FindVariable());
-				}
-				if (Var_Object)
-				{
-					if (ULegacyActor* LegacyActor = Cast<ULegacyActor>(Var_Object->ObjValue) )
+					ULegacySeqVar_Object* Var_Object = Cast<ULegacySeqVar_Object>(Variable);
+					if (ULegacySeqVar_Named* Var_Named = Cast<ULegacySeqVar_Named>(Variable))
 					{
-						for (ULegacyInterpTrack* InterpTrack :InterpTracks)
-						{
-							if (InterpTrack)
-							{
-								InterpTrack->ExportToLevelSequence(Sequencer,LegacyActor);
-							}
-						}
+						Var_Object = Cast<ULegacySeqVar_Object>(Var_Named->FindVariable());
 					}
-				}
-				else if (ULegacySeqVar_ObjectList* Var_ObjectList = Cast<ULegacySeqVar_ObjectList>(Variable))
-				{
-					for (ULegacyObject* Object:Var_ObjectList->ObjList)
+					if (Var_Object)
 					{
-						if (ULegacyActor* LegacyActor = Cast<ULegacyActor>(Object) )
+						if (ULegacyActor* LegacyActor = Cast<ULegacyActor>(Var_Object->ObjValue) )
 						{
 							for (ULegacyInterpTrack* InterpTrack :InterpTracks)
 							{
@@ -1228,9 +1546,32 @@ void ULegacyInterpGroup::ExportToLevelSequence(ULegacySeqAct_Interp* OwnerSeqAct
 							}
 						}
 					}
+					else if (ULegacySeqVar_ObjectList* Var_ObjectList = Cast<ULegacySeqVar_ObjectList>(Variable))
+					{
+						for (ULegacyObject* Object:Var_ObjectList->ObjList)
+						{
+							if (ULegacyActor* LegacyActor = Cast<ULegacyActor>(Object) )
+							{
+								for (ULegacyInterpTrack* InterpTrack :InterpTracks)
+								{
+									if (InterpTrack)
+									{
+										InterpTrack->ExportToLevelSequence(Sequencer,LegacyActor);
+									}
+								}
+							}
+						}
+					}
 				}
+				return;
 			}
-			return;
+		}
+	}
+	for (ULegacyInterpTrack* InterpTrack :InterpTracks)
+	{
+		if (InterpTrack)
+		{
+			InterpTrack->ExportToLevelSequence(Sequencer,nullptr);
 		}
 	}
 }
@@ -1388,6 +1729,7 @@ void ULegacyInterpData::ExportToLevelSequence(ULegacySeqAct_Interp* OwnerSeqActi
 			InterpGroup->ExportToLevelSequence(OwnerSeqAction, Sequencer);
 		}
 	}
+	Sequencer->Close();
 }
 
 FGuid ULegacyInterpData::FindOrCreateBinding(AActor& ActorToBind, const FString& NameBinding)

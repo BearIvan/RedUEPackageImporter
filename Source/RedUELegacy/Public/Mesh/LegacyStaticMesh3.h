@@ -264,7 +264,7 @@ struct FLegacyStaticMeshUVItem3
     
     FVector3f			Pos;			// old version (< 472)
     FPackedNormal		Normal[3];
-    FColor				Color;
+    FColor				Color = FColor::White;
     FLegacyMeshUVFloat	UV[NUM_UV_SETS_UE3];
 
     friend FRedUELegacyArchive& operator<<(FRedUELegacyArchive &Ar, FLegacyStaticMeshUVItem3 &V)
@@ -342,8 +342,8 @@ struct FLegacyStaticMeshShadowVolumeStream3
 
 struct FLegacyStaticMeshColorStream3		// ArVer >= 615
 {
-    int32				ItemSize;
-    int32				NumVerts;
+    int32				ItemSize = 0;
+    int32				NumVerts = 0;
     TArray<FColor>		Colors;
 
     friend FRedUELegacyArchive& operator<<(FRedUELegacyArchive &Ar, FLegacyStaticMeshColorStream3 &S)

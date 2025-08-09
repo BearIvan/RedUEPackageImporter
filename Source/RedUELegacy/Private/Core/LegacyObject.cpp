@@ -7,6 +7,7 @@
 #include "Core/LegacyPackage.h"
 #include "Core/LegacyTypeInfo.h"
 #include "Core/RedUELegacySubsystem.h"
+#include "World/Sequences/Object/LegacySequenceObjects.h"
 
 FLegacyRotator::operator FRotator()
 {
@@ -147,6 +148,31 @@ void ULegacyObject::LegacySerialize(FRedUELegacyArchive& Ar)
 	PreLegacySerializeUnrealProps(Ar);
     LegacySerializeUnrealProps(GetClass(),this,Ar);
     
+}
+
+void ULegacyObject::LegacySerializeComponent(FArchive& Ar)
+{
+	auto IsTemplate = [this]( int64 TemplateTypes = (0x400|0x200) ) 
+	{
+		for ( const ULegacyObject* TestOuter = this; TestOuter; TestOuter = Cast<ULegacyObject>( TestOuter->GetOuter()) )
+		{
+			if ( !!(TestOuter->LegacyObjectFlags & TemplateTypes) )
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+    
+	UObject* TemplateOwnerClass;
+	Ar<<TemplateOwnerClass;
+
+    
+	if (IsTemplate(0x200))
+	{
+		FName TemplateName;
+		Ar<<TemplateName;
+	}
 }
 
 
@@ -326,7 +352,6 @@ void ULegacyObject::PreLegacySerializeUnrealProps(FRedUELegacyArchive& Ar)
 
 void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRedUELegacyArchive& Ar)
 {
-	
 	FLegacyPropertyTag LastTag;
     while (true)
     {
@@ -340,7 +365,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
         const int32 StopPos = Ar.Tell() + Tag.DataSize;
 
         FProperty* Property = Type->FindPropertyByName(Tag.Name);
-        if(!Property||(!Property->HasAnyPropertyFlags(CPF_BlueprintVisible)||Property->HasAnyPropertyFlags(CPF_BlueprintReadOnly)))
+        if(!Property||((!Property->HasAnyPropertyFlags(CPF_BlueprintVisible)||Property->HasAnyPropertyFlags(CPF_BlueprintReadOnly))&&!Property->HasMetaData(TEXT("LegacyRead"))))
         {
             Ar.Seek(StopPos);
             continue;
@@ -354,7 +379,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
                 continue;
             }
         }
-        else if (!ensure(Tag.ArrayIndex == 0))
+        else if (!ensure(Tag.ArrayIndex < Property->ArrayDim))
         {
             Ar.Seek(StopPos);
             continue;
@@ -371,13 +396,13 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
             {
                 FString InString;
                 Ar << InString;
-                StrProperty->SetValue_InContainer(Object,InString);
+                StrProperty->SetPropertyValue_InContainer(Object,InString,Tag.ArrayIndex);
             }
             else if(FNameProperty* NameProperty = CastField<FNameProperty>(Property))
             {
                 FString InString;
                 Ar << InString;
-                NameProperty->SetValue_InContainer(Object,*InString);
+                NameProperty->SetPropertyValue_InContainer(Object,*InString,Tag.ArrayIndex);
             }
             else
             {
@@ -390,7 +415,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
     		{
     			FName InString;
     			Ar << InString;
-    			NameProperty->SetValue_InContainer(Object,InString);
+    			NameProperty->SetPropertyValue_InContainer(Object,InString,Tag.ArrayIndex);
     		}
     		else
     		{
@@ -401,7 +426,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
         {
         	if(FBoolProperty* BoolProperty = CastField<FBoolProperty>(Property))
         	{
-        		BoolProperty->SetPropertyValue_InContainer(Object,Tag.BoolValue!=0);
+        		BoolProperty->SetPropertyValue_InContainer(Object,Tag.BoolValue!=0,Tag.ArrayIndex);
         	}
         	else
         	{
@@ -410,11 +435,17 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
         }
         else  if(Tag.Type == NAME_IntProperty)
         {
-        	if(FIntProperty* ObjectProperty = CastField<FIntProperty>(Property))
+        	if(FIntProperty* IntProperty = CastField<FIntProperty>(Property))
         	{
         		int32 Number;
         		Ar<<Number;
-        		ObjectProperty->SetValue_InContainer(Object,Number);
+        		IntProperty->SetPropertyValue_InContainer(Object,Number,Tag.ArrayIndex);
+        	}
+        	else if(FBoolProperty* BoolProperty = CastField<FBoolProperty>(Property))
+        	{
+        		int32 Number;
+        		Ar<<Number;
+        		BoolProperty->SetPropertyValue_InContainer(Object,Number != 0,Tag.ArrayIndex);
         	}
         	else
         	{
@@ -427,7 +458,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
         	{
         		float Number;
         		Ar<<Number;
-        		ObjectProperty->SetValue_InContainer(Object,Number);
+        		ObjectProperty->SetPropertyValue_InContainer(Object,Number,Tag.ArrayIndex);
         	}
         	else
         	{
@@ -440,7 +471,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
             {
                 UObject*InObject;
                 Ar<<InObject;
-                ObjectProperty->SetObjectPropertyValue_InContainer(Object,InObject);
+                ObjectProperty->SetObjectPropertyValue_InContainer(Object,InObject,Tag.ArrayIndex);
             	
             }
             else
@@ -461,7 +492,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
         				int32 EnumIndex =ByteProperty->Enum->GetValueByName(EnumValue);
         				if(ensure(EnumIndex != INDEX_NONE))
         				{
-        					ByteProperty->SetValue_InContainer(Object,EnumIndex);
+        					ByteProperty->SetPropertyValue_InContainer(Object,EnumIndex,Tag.ArrayIndex);
         				}
         			}
         		}
@@ -474,7 +505,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
         				int32 EnumIndex = EnumProperty->GetEnum()->GetValueByName(EnumValue);
         				if(ensure(EnumIndex != INDEX_NONE))
         				{
-        					void* PropAddr = EnumProperty->ContainerPtrToValuePtr<void>(Object);
+        					void* PropAddr = EnumProperty->ContainerPtrToValuePtr<void>(Object,Tag.ArrayIndex);
         					IntProperty->SetIntPropertyValue(PropAddr,static_cast<int64>(EnumIndex));
         				}
         			}
@@ -494,7 +525,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
         		{
         			uint8 Byte;
         			Ar<<Byte;
-        			ByteProperty->SetValue_InContainer(Object,Byte);
+        			ByteProperty->SetPropertyValue_InContainer(Object,Byte,Tag.ArrayIndex);
         		}
 				else
 				{
@@ -509,12 +540,12 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
                 if(StructProperty->Struct->UseNativeSerialization())
                 {
                 	UScriptStruct::ICppStructOps* TheCppStructOps = StructProperty->Struct->GetCppStructOps();
-                	TheCppStructOps->Serialize(Ar,StructProperty->ContainerPtrToValuePtr<void>(Object));
+                	TheCppStructOps->Serialize(Ar,StructProperty->ContainerPtrToValuePtr<void>(Object,Tag.ArrayIndex));
                     //Ar.Serialize( StructProperty->ContainerPtrToValuePtr<void>(Object),StructProperty->Struct->GetPropertiesSize());
                 }
                 else
                 {
-                    LegacySerializeUnrealProps(StructProperty->Struct,StructProperty->ContainerPtrToValuePtr<void>(Object),Ar);
+                    LegacySerializeUnrealProps(StructProperty->Struct,StructProperty->ContainerPtrToValuePtr<void>(Object,Tag.ArrayIndex),Ar);
                 }
             }
             else
@@ -581,6 +612,15 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
             			FName InString;
             			Ar << InString;
             			NameProperty->SetValue_InContainer(ArrayHelper.GetRawPtr(Index),InString);
+            		}
+            	}
+            	else if(FFloatProperty* FloatProperty = CastField<FFloatProperty>(ArrayProperty->Inner))
+            	{
+            		for(int32 Index = 0;Index<DataCount;Index++)
+            		{
+            			float Number;
+            			Ar<<Number;
+            			FloatProperty->SetValue_InContainer(ArrayHelper.GetRawPtr(Index),Number);
             		}
             	}
                 else

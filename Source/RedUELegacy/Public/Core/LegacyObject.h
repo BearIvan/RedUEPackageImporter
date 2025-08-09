@@ -80,7 +80,7 @@ class REDUELEGACY_API ULegacyObject : public UObject
 public:
     virtual void        LegacyPostLoad              ();
     virtual void        LegacySerialize             (FRedUELegacyArchive& Ar);
-	virtual void        LegacySerializeComponent    (FArchive& Ar) { }
+	virtual void        LegacySerializeComponent    (FArchive& Ar) ;
     virtual bool        IsAComponent                () { return false; }
     virtual void        PreLegacySerializeUnrealProps	(FRedUELegacyArchive& Ar);
     virtual void        LegacySerializeUnrealProps		(UStruct* Type, void*Object,FRedUELegacyArchive& Ar);

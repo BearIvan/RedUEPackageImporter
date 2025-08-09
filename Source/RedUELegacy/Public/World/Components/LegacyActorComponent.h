@@ -12,4 +12,7 @@ public:
     
     UFUNCTION(BlueprintNativeEvent)
     void FillComponent( UActorComponent* InActorComponent);
+    
+    UPROPERTY(BlueprintReadWrite)
+    bool bAutoActivate = true;
 };

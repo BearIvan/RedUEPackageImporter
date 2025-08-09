@@ -162,6 +162,16 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	FLegacyMatrix InvInitialTransform;
 	
-
+};
+UCLASS()
+class REDUELEGACY_API ULegacyEmitter : public ULegacyActor
+{
+	GENERATED_BODY()
+public:
 	
+	virtual UClass* GetActorClass_Implementation() override;
+	virtual void	FillActor_Implementation		(AActor* InActor) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	class ULegacyPrimitiveComponent* ParticleSystemComponent;
 };

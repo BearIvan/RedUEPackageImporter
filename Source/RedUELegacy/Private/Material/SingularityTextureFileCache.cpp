@@ -23,6 +23,11 @@ FSingularityTextureFileCacheInfo* USingularityTextureFileCache::Get(const FGuid&
 	
 }
 
+void USingularityTextureFileCache::Empty()
+{
+	TFCTextureMap.Empty();
+}
+
 void USingularityTextureFileCache::Load()
 {
 	for (const FString&InContentPath :GetTypedOuter<URedUELegacySubsystem>()->InContentPaths)
