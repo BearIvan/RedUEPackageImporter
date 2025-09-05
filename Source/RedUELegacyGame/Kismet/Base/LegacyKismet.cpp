@@ -1,5 +1,6 @@
 ﻿#include "LegacyKismet.h"
 
+#include "EngineUtils.h"
 #include "LegacyKismetGeneratedClass.h"
 #include "SequenceAction.h"
 #include "Kismet/GameplayStatics.h"
@@ -74,3 +75,21 @@ USequenceAction* ALegacyKismet::GetSequenceAction(FGuid ActionGuid, TSubclassOf<
 ABioshockKismet::ABioshockKismet(): ElizabethPawn(nullptr)
 {
 }
+
+void ABioshockKismet::RefreshElizabethPawn()
+{
+	static FName NAME_Elizabeth = "Elizabeth";
+	if (ElizabethPawn == nullptr)
+	{
+		for (TActorIterator<APawn> It(GetWorld(), APawn::StaticClass()); It; ++It)
+		{
+			APawn* Actor = *It;
+			if (IsValid(Actor) && Actor->ActorHasTag(NAME_Elizabeth))
+			{
+				ElizabethPawn = Actor;
+				break;
+			}
+		}
+	}
+}
+

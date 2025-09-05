@@ -30,3 +30,11 @@ public:
 	ULegacyXAKAudioEventID* StopEvent;
 
 };
+
+UCLASS()
+class REDUELEGACY_API ULegacyXEffectSpeechPostEvent: public ULegacyXEffectSound
+{
+	GENERATED_BODY()
+public:
+
+};

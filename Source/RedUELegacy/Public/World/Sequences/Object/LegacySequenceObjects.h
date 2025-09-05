@@ -407,6 +407,15 @@ public:
 };
 
 UCLASS()
+class REDUELEGACY_API ULegacyXSeqVar_Elizabeth : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	
+	
+};
+UCLASS()
 class REDUELEGACY_API ULegacyXSeqVar_SinglePlayerController : public ULegacySequenceVariable
 {
 	GENERATED_BODY()
@@ -474,14 +483,125 @@ public:
 };
 
 UCLASS()
+class REDUELEGACY_API ULegacyXPatternCommand_Base: public ULegacyObject
+{
+	GENERATED_BODY()
+public:
+	
+	virtual class UXPatternCommandBase* MakeCommand(class UXSeqAct_InstancePattern* InstancePattern);
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXPatternUObjectSetBase: public ULegacyObject
+{
+	GENERATED_BODY()
+public:
+	virtual class UXPatternObjectSetBase* MakeObjectSet(class UXSeqAct_InstancePattern* InstancePattern);
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXPatternUObjectSet_PlayerPawns: public ULegacyXPatternUObjectSetBase
+{
+	GENERATED_BODY()
+public:
+	virtual class UXPatternObjectSetBase* MakeObjectSet(class UXSeqAct_InstancePattern* InstancePattern) override;
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXPatternUObjectSet_ElizabethPawns: public ULegacyXPatternUObjectSetBase
+{
+	GENERATED_BODY()
+public:
+	virtual class UXPatternObjectSetBase* MakeObjectSet(class UXSeqAct_InstancePattern* InstancePattern) override;
+};
+UCLASS()
+class REDUELEGACY_API ULegacyXPatternCommand_ActivateNamedPatternKismetEvent: public ULegacyXPatternCommand_Base
+{
+	GENERATED_BODY()
+public:
+	virtual class UXPatternCommandBase* MakeCommand(class UXSeqAct_InstancePattern* InstancePattern) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName KismetPatternEventName;
+};
+
+
+UCLASS()
+class REDUELEGACY_API ULegacyXPatternCommand_PlaySound: public ULegacyXPatternCommand_Base
+{
+	GENERATED_BODY()
+public:
+	virtual class UXPatternCommandBase* MakeCommand(class UXSeqAct_InstancePattern* InstancePattern) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	class ULegacyXEffectSound* PlaySound;
+
+	UPROPERTY(BlueprintReadWrite)
+	ULegacyXPatternUObjectSetBase* Targets;
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXPatternCommand_PlaySpeech: public ULegacyXPatternCommand_Base
+{
+	GENERATED_BODY()
+public:
+	virtual class UXPatternCommandBase* MakeCommand(class UXSeqAct_InstancePattern* InstancePattern) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	class ULegacyXEffectSpeechPostEvent* SpeechRequest;
+
+	UPROPERTY(BlueprintReadWrite)
+	ULegacyXPatternUObjectSetBase* PossibleSpeakers;
+};
+UCLASS()
+class REDUELEGACY_API ULegacyXPatternEvent_TimeElapsed: public ULegacyXPatternCommand_Base
+{
+	GENERATED_BODY()
+public:
+	virtual class UXPatternCommandBase* MakeCommand(class UXSeqAct_InstancePattern* InstancePattern) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	float SleepDurationSeconds = 0.f;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool bUseAudioTime = false;
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXPatternEvent_AudioTimeElapsed: public ULegacyXPatternEvent_TimeElapsed
+{
+	GENERATED_BODY()
+public:
+	virtual class UXPatternCommandBase* MakeCommand(class UXSeqAct_InstancePattern* InstancePattern) override;
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacyXPattern_AutomaticallyRun : public ULegacyObject
+{
+	GENERATED_BODY()
+public:
+	virtual void ExportToInstancePattern(class UXSeqAct_InstancePattern* InstancePattern);
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<ULegacyXPatternCommand_Base*> Sequence;
+};
+
+
+UCLASS()
 class REDUELEGACY_API ULegacyXSeqAct_InstancePattern : public ULegacySequenceImporter
 {
 	GENERATED_BODY()
 public:
 	ULegacyXSeqAct_InstancePattern();
 
-	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
-	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UK2Node_SequenceAction* 	ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						FillAction			(USequenceAction* InSequenceAction) override;
+
+	UPROPERTY(BlueprintReadWrite)
+	ULegacyXPattern_AutomaticallyRun*	BasePatternArchetype;
+
+	UPROPERTY()
+	TMap<FName,FName> EventNameToFullName;
 };
 
 UCLASS()

@@ -42,9 +42,13 @@ class REDUELEGACYGAME_API ABioshockKismet : public ALegacyKismet
 public:
 	ABioshockKismet();
 
+	UFUNCTION(BlueprintCallable,Category="Kismet|Bioshock")
+	void RefreshElizabethPawn();
+	
 	UPROPERTY(BlueprintReadOnly, Category="Kismet|Bioshock")
 	bool ElizabethIsActive = false;
 
 	UPROPERTY(BlueprintReadOnly, Category="Kismet|Bioshock")
 	APawn* ElizabethPawn;
+
 };

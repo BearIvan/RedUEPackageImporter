@@ -1,10 +1,12 @@
 ﻿#include "WWiseBanksManager.h"
 
+#include "Core/LegacyPackage.h"
 #include "EdGraph/EdGraphSchema.h"
 #include "Sound/SoundNodeDialoguePlayer.h"
 #include "Sound/SoundNodeRandom.h"
 #include "Sound/SoundNodeWavePlayer.h"
 #include "SoundCueGraph/SoundCueGraphNode.h"
+#include "World/LegacyWorld.h"
 
 THIRD_PARTY_INCLUDES_START
 
@@ -369,18 +371,26 @@ bool FWWiseBank::Load(const FString& InFileName)
 		else if (FMemory::Memcmp(ChunkName,"AKPK",4) == 0)
 		{
 			DataOffset = 0;
-			uint8 Unknown[0x2C];
-			Ar.Serialize(Unknown,sizeof(Unknown));
+			{
+				int32 Unknown;
+				Ar << Unknown;
+			}
+			int32 SizeBlock;
+			Ar << SizeBlock;
+			Ar.Seek(Ar.Tell() + SizeBlock + 0x10);	
+			
 			int32 Count;
 			Ar << Count;
 			for (int32 i = 0; i < Count; i++)
 			{
 				int32 Index;
-				int32 Unknown2 =0;
-				int64 Offset;
+				int32 Unknown2 = 0;
+				int32 Offset;
+				int32 Unknown3 = 0;
 				int32 Size;
-				Ar<<Index<<Unknown2<<Size<<Offset;
+				Ar<<Index<<Unknown2<<Size<<Offset<<Unknown3;
 				ensure(Unknown2 == 1);
+				ensure(Unknown3 == 1 || Unknown3 == 0);
 				
 				FWWiseBankSound Sound;
 				Sound.Offset = Offset;
@@ -627,23 +637,37 @@ USoundBase* FWWiseBank::CreateOrLoadSound(int32 SoundID) const
 USoundBase* UWWiseBanksManager::ExportToContent(const FString&LevelName, int32 AudioID)
 {
 	LoadGlobalBanks();
-	
-	TArray<TSharedPtr<FWWiseBank>>* Banks = WWiseBanks.Find(LevelName);
-	if (!Banks)
+
+	auto LambdaExportToContent = [this,AudioID](const FString&LevelName)->USoundBase*
 	{
-		Banks = LoadBanksForLevel(LevelName);
-	}
-	if (ensure(Banks))
-	{
-		for (TSharedPtr<FWWiseBank>& Bank : *Banks)
+		TArray<TSharedPtr<FWWiseBank>>* Banks = WWiseBanks.Find(LevelName);
+		if (!Banks)
 		{
-			if (Bank->IsValid(AudioID))
+			Banks = LoadBanksForLevel(LevelName);
+		}
+		if (ensure(Banks))
+		{
+			for (TSharedPtr<FWWiseBank>& Bank : *Banks)
 			{
-				return Bank->ExportToContent(AudioID);
+				if (Bank->IsValid(AudioID))
+				{
+					return Bank->ExportToContent(AudioID);
+				}
+			}
+		}
+		return nullptr;
+	};
+	{
+		URedUELegacySubsystem* RedUELegacySubsystem = GetTypedOuter<URedUELegacySubsystem>();
+		if (RedUELegacySubsystem->GLegacyWorld)
+		{
+			if (USoundBase* Result = LambdaExportToContent(FPaths::GetBaseFilename(RedUELegacySubsystem->GLegacyWorld->LegacyPackage->FileName)))
+			{
+				return Result;
 			}
 		}
 	}
-	return nullptr;
+	return LambdaExportToContent(LevelName);
 	
 }
 
@@ -696,6 +720,15 @@ TArray<TSharedPtr<FWWiseBank>>* UWWiseBanksManager::LoadBanksForLevel(const FStr
 				Result.Add(Bank);
 			}
 		}
+		FileName = FPaths::Combine(BanksPath,TEXT("English(US)"),LevelName.ToUpper() + TEXT("_L.bnk"));
+		if (FPaths::FileExists(FileName))
+		{
+			TSharedPtr<FWWiseBank> Bank = MakeShared<FWWiseBank>(this);
+			if (Bank->Load(FileName))
+			{
+				Result.Add(Bank);
+			}
+		}
 	}
 	if (Result.Num() > 0)
 	{
@@ -713,20 +746,41 @@ void UWWiseBanksManager::LoadGlobalBanks()
 	}
 	for (const FString& ContentPath : GetTypedOuter<URedUELegacySubsystem>()->InContentPaths)
 	{
-		FString BanksPath = FPaths::Combine(ContentPath,TEXT(".."),TEXT("Audio"),TEXT("Packed"),TEXT("Windows"),TEXT("Packs"));
-
-		TArray<FString> Files;
-		IFileManager::Get().FindFiles(Files,*BanksPath,TEXT("*.pck"));
-
-		for (FString File : Files)
 		{
-			FString FilePath = FPaths::Combine(BanksPath,File);
-			if (ensure(FPaths::FileExists(FilePath)))
+			FString BanksPath = FPaths::Combine(ContentPath,TEXT(".."),TEXT("Audio"),TEXT("Packed"),TEXT("Windows"),TEXT("Packs"));
+
+			TArray<FString> Files;
+			IFileManager::Get().FindFiles(Files,*BanksPath,TEXT("*.pck"));
+
+			for (FString File : Files)
 			{
-				TSharedPtr<FWWiseBank> Bank = MakeShared<FWWiseBank>(this);
-				if (Bank->Load(FilePath))
+				FString FilePath = FPaths::Combine(BanksPath,File);
+				if (ensure(FPaths::FileExists(FilePath)))
 				{
-					GlobalBanks.Add(Bank);
+					TSharedPtr<FWWiseBank> Bank = MakeShared<FWWiseBank>(this);
+					if (Bank->Load(FilePath))
+					{
+						GlobalBanks.Add(Bank);
+					}
+				}
+			}
+		}
+		{
+			FString BanksPath = FPaths::Combine(ContentPath,TEXT(".."),TEXT("Audio"),TEXT("Packed"),TEXT("Windows"),TEXT("Packs"),TEXT("English(US)"));
+
+			TArray<FString> Files;
+			IFileManager::Get().FindFiles(Files,*BanksPath,TEXT("*.pck"));
+
+			for (FString File : Files)
+			{
+				FString FilePath = FPaths::Combine(BanksPath,File);
+				if (ensure(FPaths::FileExists(FilePath)))
+				{
+					TSharedPtr<FWWiseBank> Bank = MakeShared<FWWiseBank>(this);
+					if (Bank->Load(FilePath))
+					{
+						GlobalBanks.Add(Bank);
+					}
 				}
 			}
 		}

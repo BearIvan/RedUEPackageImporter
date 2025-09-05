@@ -524,6 +524,11 @@ FName ULegacyXSeqVar_PlayerController::GetOrCreateVariable(UBlueprint* InBluepri
 	return GET_MEMBER_NAME_CHECKED(ALegacyKismet,PlayerController);
 }
 
+FName ULegacyXSeqVar_Elizabeth::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	return GET_MEMBER_NAME_CHECKED(ABioshockKismet,ElizabethPawn);
+}
+
 ULegacySeqAct_Interp::ULegacySeqAct_Interp()
 {
 	ToAction = CreateDefaultSubobject<USeqAct_Interp>("USeqAct_Interp");
@@ -624,6 +629,92 @@ void ULegacySeqAct_Interp::SimulatedImport()
 	InterpData->OwnerSeqAct_Interp = this;
 }
 
+class UXPatternCommandBase* ULegacyXPatternCommand_ActivateNamedPatternKismetEvent::MakeCommand(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	if (ULegacyXSeqAct_InstancePattern* Owner = GetTypedOuter<ULegacyXSeqAct_InstancePattern>())
+	{
+		if (FName* FullName = Owner->EventNameToFullName.Find(KismetPatternEventName))
+		{
+			UXPatternCommand_KismetEvent* Result = NewObject<UXPatternCommand_KismetEvent>(InstancePattern,NAME_None,RF_Transactional);
+			Result->EventName = *FullName;
+			return Result;
+		}
+	}
+	return Super::MakeCommand(InstancePattern);
+}
+
+class UXPatternCommandBase* ULegacyXPatternCommand_Base::MakeCommand(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	return nullptr;
+}
+
+class UXPatternObjectSetBase* ULegacyXPatternUObjectSet_ElizabethPawns::MakeObjectSet(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	return NewObject<UXPatternObjectSet_ElizabethPawn>(InstancePattern,NAME_None,RF_Transactional);
+}
+
+class UXPatternObjectSetBase* ULegacyXPatternUObjectSet_PlayerPawns::MakeObjectSet(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	return NewObject<UXPatternObjectSet_Player>(InstancePattern,NAME_None,RF_Transactional);
+}
+
+class UXPatternObjectSetBase* ULegacyXPatternUObjectSetBase::MakeObjectSet(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	return nullptr;
+}
+
+class UXPatternCommandBase* ULegacyXPatternCommand_PlaySound::MakeCommand(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	UXPatternCommand_PlayAudio* Result = NewObject<UXPatternCommand_PlayAudio>(InstancePattern,NAME_None,RF_Transactional);
+	if (PlaySound->PlayEvent)
+	{
+		Result->Audio =  Cast<USoundBase>(PlaySound->PlayEvent->ExportToContent());
+	}
+	Result->Target = Targets->MakeObjectSet(InstancePattern);
+	return Result;
+}
+
+class UXPatternCommandBase* ULegacyXPatternEvent_AudioTimeElapsed::MakeCommand(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	UXPatternCommand_AudioTimeElapsed* Result = NewObject<UXPatternCommand_AudioTimeElapsed>(InstancePattern,NAME_None,RF_Transactional);
+	Result->bUseAudioTime = bUseAudioTime;
+	Result->SleepDurationSeconds = SleepDurationSeconds;
+	return Result;
+}
+
+class UXPatternCommandBase* ULegacyXPatternEvent_TimeElapsed::MakeCommand(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	UXPatternCommand_TimeElapsed* Result = NewObject<UXPatternCommand_TimeElapsed>(InstancePattern,NAME_None,RF_Transactional);
+	Result->bUseAudioTime = bUseAudioTime;
+	Result->SleepDurationSeconds = SleepDurationSeconds;
+	return Result;
+}
+
+class UXPatternCommandBase* ULegacyXPatternCommand_PlaySpeech::MakeCommand(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	UXPatternCommand_Speak* Result = NewObject<UXPatternCommand_Speak>(InstancePattern,NAME_None,RF_Transactional);
+	Result->Speaker = PossibleSpeakers->MakeObjectSet(InstancePattern);
+	if ( SpeechRequest->PlayEvent)
+	{
+		Result->Audio = Cast<USoundBase>(SpeechRequest->PlayEvent->ExportToContent());
+	}
+	return Result;
+}
+
+void ULegacyXPattern_AutomaticallyRun::ExportToInstancePattern(class UXSeqAct_InstancePattern* InstancePattern)
+{
+	for (ULegacyXPatternCommand_Base* Command : Sequence)
+	{
+		if (Command)
+		{
+			if (UXPatternCommandBase* NewCommand =  Command->MakeCommand(InstancePattern))
+			{
+				InstancePattern->Commands.Add(NewCommand);
+			}
+		}
+	}
+}
+
 ULegacyXSeqAct_InstancePattern::ULegacyXSeqAct_InstancePattern()
 {
 	ToAction = CreateDefaultSubobject<UXSeqAct_InstancePattern>("XSeqAct_InstancePattern");
@@ -633,13 +724,23 @@ UK2Node_SequenceAction* ULegacyXSeqAct_InstancePattern::ExportToBlueprint(UBluep
 {
 	bool NeedCreateEvent = false;
 	if (!CurrentNode)
-	{		
+	{
+		for (int32  i = 4;i<OutputLinks.Num();i++)
+		{
+			FString EventName = OutputLinks[i].XLinkName.ToString();
+			if (EventName.IsEmpty())
+			{
+				EventName = *OutputLinks[i].LinkDesc;
+			}
+			FName FirstName = *EventName;
+			EventName = GetLegacyName() + TEXT("_") + EventName;
+			EventNameToFullName.Add(FirstName, *EventName);
+		}
 		NeedCreateEvent = true;
 	}	
 	UK2Node_SequenceAction*  Result = Super::ExportToBlueprint(InBlueprint, InGraph);
 	if (NeedCreateEvent)
 	{
-		
 		for (int32  i = 4;i<OutputLinks.Num();i++)
 		{
 			UK2Node_CustomEvent* NewEventNode = NewObject<UK2Node_CustomEvent>(InGraph);
@@ -649,8 +750,7 @@ UK2Node_SequenceAction* ULegacyXSeqAct_InstancePattern::ExportToBlueprint(UBluep
 			{
 				EventName = *OutputLinks[i].LinkDesc;
 			}
-			EventName = GetLegacyName() + EventName;
-			
+			EventName = GetLegacyName() + TEXT("_") + EventName;
 			NewEventNode->CustomFunctionName = *EventName;
 			NewEventNode->CreateNewGuid();
 			NewEventNode->PostPlacedNewNode();
@@ -661,17 +761,20 @@ UK2Node_SequenceAction* ULegacyXSeqAct_InstancePattern::ExportToBlueprint(UBluep
 			NewEventNode->OnUpdateCommentText(GetLegacyFullName());
 			UEdGraphSchema_K2::SetNodeMetaData(NewEventNode, FNodeMetadata::DefaultGraphNode);
 			InGraph->AddNode(NewEventNode);
-			FillPin(InBlueprint,InGraph,OutputLinks[i],NewEventNode ->GetThenPin());			
+			FillPin(InBlueprint,InGraph,OutputLinks[i],NewEventNode ->GetThenPin());
 		}
-		
 	}
-	
 	return Result;
 }
 
-UEdGraphPin* ULegacyXSeqAct_InstancePattern::GetInputPin(int32 Index, UBlueprint* InBlueprint, UEdGraph* InGraph)
+void ULegacyXSeqAct_InstancePattern::FillAction(USequenceAction* InSequenceAction)
 {
-	return Super::GetInputPin(Index, InBlueprint, InGraph);
+	Super::FillAction(InSequenceAction);
+	UXSeqAct_InstancePattern *InstancePattern = CastChecked<UXSeqAct_InstancePattern>(InSequenceAction);
+	if (BasePatternArchetype)
+	{
+		BasePatternArchetype->ExportToInstancePattern(InstancePattern);
+	}
 }
 
 ULegacySeqAct_SetMaterial::ULegacySeqAct_SetMaterial()
@@ -734,6 +837,7 @@ void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>
 	Track->SetDisplayName(FText::FromString(InterpGroup->GroupName.ToString()));
 	UMovieSceneEventTriggerSection* Section = CastChecked<UMovieSceneEventTriggerSection>(Track->CreateNewSection());
 	Track->AddSection(*Section);
+	Section->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
 	
 	FMovieSceneSequenceEditor* SequenceEditor = FMovieSceneSequenceEditor::Find(Sequencer->GetRootMovieSceneSequence());
 	if (!ensure(SequenceEditor))
@@ -1040,6 +1144,8 @@ void ULegacyInterpTrackAnimControl::ExportToLevelSequence(const TSharedRef<ISequ
 		{
 			ensure (!Seq.bLooping);
 			UMovieSceneSkeletalAnimationSection* AnimationSection = CastChecked<UMovieSceneSkeletalAnimationSection>(Track->AddNewAnimation(Sequencer->GetRootTickResolution().AsFrameNumber(Seq.StartTime),AnimSequence));
+			
+			AnimationSection->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
 			AnimationSection->Params.PlayRate = Seq.AnimPlayRate;
 			AnimationSection->Params.bReverse = Seq.bReverse;
 			AnimationSection->Params.StartFrameOffset = ConvertFrameTime(FFrameTime::FromDecimal(DisplayRate.AsDecimal() * Seq.AnimStartOffset), DisplayRate, TickResolution).FrameNumber;
@@ -1310,6 +1416,7 @@ void ULegacyInterpTrackFloatMaterialParam::ExportToLevelSequence(const TSharedRe
 	
 	UMovieSceneHybridMaterialParameterSection* Section = CastChecked<UMovieSceneHybridMaterialParameterSection>(Track->CreateNewSection());
 
+	Section->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
 	if (Section)
 	{
 		Track->Modify();
@@ -1416,6 +1523,7 @@ void ULegacyInterpTrackFloatParticleParam::ExportToLevelSequence(const TSharedRe
 	UMovieSceneParticleParameterTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneParticleParameterTrack>(ObjectGuid);
 	
 	UMovieSceneParameterSection* Section = CastChecked<UMovieSceneParameterSection>(Track->CreateNewSection());
+	Section->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
 
 	if (Section)
 	{
@@ -1423,7 +1531,6 @@ void ULegacyInterpTrackFloatParticleParam::ExportToLevelSequence(const TSharedRe
 		Track->AddSection(*Section);
 	}
 	Section->AddScalarParameterKey(ParamName,Sequencer->GetRootTickResolution().AsFrameNumber(FloatTrack.Points[0].InVal),FloatTrack.Points[0].OutVal);
-
 	
 	FMovieSceneFloatChannel*FloatChannel = nullptr;
 	{
@@ -1504,6 +1611,7 @@ void ULegacyXAKInterpTrackPostEvent::ExportToLevelSequence(const TSharedRef<ISeq
 				FFrameNumber Time = Sequencer->GetRootTickResolution().AsFrameNumber(Key.Time);
 				if (UMovieSceneSection* MovieSceneSection = Track->AddNewSound(Sound,Time))
 				{
+					MovieSceneSection->EvalOptions.CompletionMode = EMovieSceneCompletionMode::KeepState;
 					MovieSceneSection->Modify();
 				}
 			}
