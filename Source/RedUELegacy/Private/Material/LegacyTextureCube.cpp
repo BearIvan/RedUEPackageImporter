@@ -1,6 +1,4 @@
-﻿// Tyran
-
-
+﻿
 #include "Material/LegacyTextureCube.h"
 
 #include "PackageTools.h"

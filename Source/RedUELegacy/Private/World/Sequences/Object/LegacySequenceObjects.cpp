@@ -670,7 +670,10 @@ class UXPatternCommandBase* ULegacyXPatternCommand_PlaySound::MakeCommand(class 
 	{
 		Result->Audio =  Cast<USoundBase>(PlaySound->PlayEvent->ExportToContent());
 	}
-	Result->Target = Targets->MakeObjectSet(InstancePattern);
+	if (Targets)
+	{
+		Result->Target = Targets->MakeObjectSet(InstancePattern);
+	}
 	return Result;
 }
 
@@ -1154,7 +1157,6 @@ void ULegacyInterpTrackAnimControl::ExportToLevelSequence(const TSharedRef<ISequ
 	
 	}
 }
-
 void ULegacyInterpTrackMove::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
 {
 	if (!ensure(LegacyAction))
@@ -1184,6 +1186,7 @@ void ULegacyInterpTrackMove::ExportToLevelSequence(const TSharedRef<ISequencer>&
 	{
 		return;
 	}
+
 	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*SceneComponent,InterpGroup->GroupName.ToString());
 	UMovieScene3DTransformTrack* MovieSceneTrack = InterpData->FindOrCreateTrack<UMovieScene3DTransformTrack>(ObjectGuid);
 	FTransform3f ComponentRotationTransform( FQuat4f(SceneComponent->GetComponentQuat()));

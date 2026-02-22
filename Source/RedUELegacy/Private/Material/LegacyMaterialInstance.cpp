@@ -101,7 +101,7 @@ void ULegacyMaterialInstance::LegacySerialize(FRedUELegacyArchive& Ar)
 			Ar << StaticParameters.BaseMaterialId << StaticParameters.StaticSwitchParameters << StaticParameters.StaticComponentMaskParameters;
 		}
 	}
-	else if (Ar.Game == ERedUELegacyGame::Bioshock3)
+	else if (Ar.Game == ERedUELegacyGame::Bioshock3 && Ar.GetStopper() != Ar.Tell())
 	{
 		FGuid Guid;
 		Ar<<Guid;

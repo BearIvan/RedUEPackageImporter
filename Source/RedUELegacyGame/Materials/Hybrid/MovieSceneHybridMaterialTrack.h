@@ -2,7 +2,7 @@
 
 #include "Tracks/MovieSceneMaterialTrack.h"
 #include "MovieSceneHybridMaterialTrack.generated.h"
-
+class UMaterialInstanceHybrid;
 UCLASS()
 class REDUELEGACYGAME_API UMovieSceneHybridMaterialTrack : public UMovieSceneMaterialTrack
 	, public IMovieSceneEntityProvider

@@ -7,7 +7,7 @@
 #include "Tracks/MovieSceneMaterialTrack.h"
 #define LOCTEXT_NAMESPACE "RedUELegacy"
 
-namespace UE::MovieScene
+namespace Rbmk::MovieScene
 {
 
 	/* Entity IDs are an encoded type and index, with the upper 8 bits being the type, and the lower 24 bits as the index */
@@ -32,7 +32,7 @@ void UMovieSceneHybridMaterialParameterSection::ImportEntityImpl(UMovieSceneEnti
 
 	uint8 ParameterType = 0;
 	int32 EntityIndex = 0;
-	DecodeMaterialParameterEntityID(Params.EntityID, EntityIndex, ParameterType);
+	Rbmk::MovieScene::DecodeMaterialParameterEntityID(Params.EntityID, EntityIndex, ParameterType);
 
 	FBuiltInComponentTypes* BuiltInComponentTypes = FBuiltInComponentTypes::Get();
 	FMovieSceneTracksComponentTypes* TracksComponentTypes = FMovieSceneTracksComponentTypes::Get();

@@ -1,4 +1,1 @@
-﻿// Tyran
-
-
-#include "World/LegacyPrefab.h"
+﻿#include "World/LegacyPrefab.h"

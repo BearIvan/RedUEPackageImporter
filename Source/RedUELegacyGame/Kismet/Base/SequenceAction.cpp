@@ -1,7 +1,9 @@
 ﻿#include "SequenceAction.h"
 #include "LegacyKismet.h"
-#include "Kismet2/BlueprintEditorUtils.h"
 
+#if WITH_EDITOR
+#include "Kismet2/BlueprintEditorUtils.h"
+#endif
 void USequenceAction::Construct()
 {
 	if (ALegacyKismet* LegacyKismet = GetTypedOuter<ALegacyKismet>())
@@ -30,6 +32,7 @@ void USequenceAction::Tick(float DeltaTime)
 {
 }
 
+#if WITH_EDITOR
 void USequenceAction::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	UObject::PostEditChangeProperty(PropertyChangedEvent);
@@ -76,7 +79,7 @@ void USequenceAction::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 
 	
 }
-
+#endif
 ALegacyKismet* USequenceAction::GetOwnerKismetChecked()
 {
 	ALegacyKismet* Kismet = GetTypedOuter<ALegacyKismet>();

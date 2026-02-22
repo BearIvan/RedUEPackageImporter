@@ -28,7 +28,7 @@ FLegacyRotator& FLegacyRotator::operator=(const FRotator3f& Rotator)
 
 bool FLegacyMatrix::Serialize(FArchive& Ar)
 {
-	if (Ar.IsLoading()||Ar.IsSaving())
+	if (Ar.IsLoading() || Ar.IsSaving())
 	{
 		FPlane4f PlaneX = FPlane4f(Data.M[0][0],Data.M[0][1],Data.M[0][2],Data.M[0][3]);
 		Ar<<PlaneX.W<<PlaneX[0]<<PlaneX[1]<<PlaneX[2];

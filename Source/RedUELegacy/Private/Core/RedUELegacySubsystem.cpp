@@ -1,7 +1,4 @@
-﻿// Tyran
-
-
-#include "Core/RedUELegacySubsystem.h"
+﻿#include "Core/RedUELegacySubsystem.h"
 
 #include "Editor.h"
 #include "EditorLevelUtils.h"

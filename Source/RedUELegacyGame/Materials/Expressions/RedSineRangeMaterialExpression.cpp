@@ -7,6 +7,7 @@ URedSineRangeMaterialExpression::URedSineRangeMaterialExpression(const FObjectIn
 	Period=1.0f;
 }
 
+#if WITH_EDITOR
 int32 URedSineRangeMaterialExpression::Compile(FMaterialCompiler* Compiler, int32 OutputIndex)
 {
 	return  Compiler->Clamp( Compiler->Sine(Period > 0.0f ? Compiler->Mul(Compiler->GameTime(true, Period), Compiler->Constant(2.0f * PI / Period)) : Compiler->GameTime(true, 2.0f * PI)), Compiler->Constant(Min), Compiler->Constant(Max));
@@ -16,3 +17,4 @@ void URedSineRangeMaterialExpression::GetCaption(TArray<FString>& OutCaptions) c
 {
 	OutCaptions.Add(TEXT("RedUE Legacy SineRange"));
 }
+#endif

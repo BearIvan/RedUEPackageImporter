@@ -5,7 +5,6 @@
 #include "IPropertyAccessEditor.h"
 #include "K2Node_FunctionEntry.h"
 #include "Blueprint/Kismet/K2Node_SequenceAction.h"
-#include "Blueprint/Kismet/LegacyKismetBlueprint.h"
 #include "Engine/MemberReference.h"
 #include "Kismet/Base/SequenceAction.h"
 #include "Kismet2/BlueprintEditorUtils.h"

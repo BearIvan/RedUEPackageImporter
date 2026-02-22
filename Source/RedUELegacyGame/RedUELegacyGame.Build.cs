@@ -21,15 +21,23 @@ public class RedUELegacyGame : ModuleRules
                 "Slate",
                 "SlateCore",
                 "Projects",
-                "UnrealEd",
                 "RenderCore",
                 "LevelSequence",
                 "MovieScene",
-                "MovieSceneTools",
                 "MovieSceneTracks"
             }
         );
         
         PublicIncludePaths.Add(ModuleDirectory);
+        if (Target.bBuildEditor == true)
+        {
+            PrivateDependencyModuleNames.AddRange(
+                new string[]
+                {
+                    "UnrealEd",
+                    "MovieSceneTools",
+                }
+            );
+        }
     }
 }

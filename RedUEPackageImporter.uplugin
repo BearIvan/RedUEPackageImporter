@@ -18,7 +18,7 @@
 	"Modules": [
 		{
 			"Name": "RedUELegacy",
-			"Type": "Editor",
+			"Type": "UncookedOnly",
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
 				"Win64"

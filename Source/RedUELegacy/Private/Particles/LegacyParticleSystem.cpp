@@ -43,22 +43,29 @@ void ULegacyParticleSpriteEmitter::Export(UParticleSystem* NewParticleSystem)
 		int32 Index = NewParticleSpriteEmitter->CreateLODLevel(LodIndex++);
 		LegacyParticleLOD->Export(NewParticleSystem, NewParticleSpriteEmitter->LODLevels[Index]);
 	}
+
 	NewParticleSpriteEmitter->UpdateModuleLists();
 	NewParticleSpriteEmitter->PostEditChange();
-	
-	for (int32 LODIndex = 0; LODIndex < NewParticleSpriteEmitter->LODLevels.Num(); LODIndex++)
+	if (LODLevels.IsEmpty())
 	{
-		if (UParticleLODLevel* NewEmitterLODLevel = NewParticleSpriteEmitter->GetLODLevel(LODIndex))
+		NewParticleSpriteEmitter->CreateLODLevel(LodIndex);
+	}
+	else
+	{
+		for (int32 LODIndex = 0; LODIndex < NewParticleSpriteEmitter->LODLevels.Num(); LODIndex++)
 		{
-			NewEmitterLODLevel->SetFlags(RF_Transactional);
-			check(NewEmitterLODLevel->RequiredModule);
-			NewEmitterLODLevel->RequiredModule->SetTransactionFlag();
-			check(NewEmitterLODLevel->SpawnModule);
-			NewEmitterLODLevel->SpawnModule->SetTransactionFlag();
-			for (int32 jj = 0; jj < NewEmitterLODLevel->Modules.Num(); jj++)
+			if (UParticleLODLevel* NewEmitterLODLevel = NewParticleSpriteEmitter->GetLODLevel(LODIndex))
 			{
-				UParticleModule* pkModule = NewEmitterLODLevel->Modules[jj];
-				pkModule->SetTransactionFlag();
+				NewEmitterLODLevel->SetFlags(RF_Transactional);
+				check(NewEmitterLODLevel->RequiredModule);
+				NewEmitterLODLevel->RequiredModule->SetTransactionFlag();
+				check(NewEmitterLODLevel->SpawnModule);
+				NewEmitterLODLevel->SpawnModule->SetTransactionFlag();
+				for (int32 jj = 0; jj < NewEmitterLODLevel->Modules.Num(); jj++)
+				{
+					UParticleModule* pkModule = NewEmitterLODLevel->Modules[jj];
+					pkModule->SetTransactionFlag();
+				}
 			}
 		}
 	}

@@ -14,7 +14,7 @@
 
 
 UMovieSceneHybridMaterialTrack::UMovieSceneHybridMaterialTrack(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer), MaterialIndex_DEPRECATED(0)
+	: Super(ObjectInitializer)
 {
 	BuiltInTreePopulationMode = ETreePopulationMode::Blended;
 }

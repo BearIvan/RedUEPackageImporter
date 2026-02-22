@@ -122,7 +122,9 @@ public:
 	virtual void					Construct				();
 	virtual void					BeginPlay				();
 	virtual void					Tick					(float DeltaTime);
+#if WITH_EDITOR
 	virtual void					PostEditChangeProperty	(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
 			ALegacyKismet*			GetOwnerKismetChecked	();
 			const ALegacyKismet*	GetOwnerKismetChecked	() const;
 	UPROPERTY()

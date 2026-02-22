@@ -1,7 +1,4 @@
-﻿// Tyran
-
-
-#include "World/Components/LegacyActorComponent.h"
+﻿#include "World/Components/LegacyActorComponent.h"
 
 
 void ULegacyActorComponent::LegacySerializeComponent(FArchive& Ar)
