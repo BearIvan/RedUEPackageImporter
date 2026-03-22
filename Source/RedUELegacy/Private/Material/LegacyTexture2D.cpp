@@ -75,8 +75,6 @@ UObject* ULegacyTexture2D::ExportToContent()
     if(!Texture2D)
     {
     	bool IsHDR = false;
-    	RedImageTool::RedImage Image;
-    	ExportTo(Image,&IsHDR);
 
     	
     	UPackage*  AssetPackage = CreatePackage(*PackageName);
@@ -84,6 +82,7 @@ UObject* ULegacyTexture2D::ExportToContent()
     	Texture2D->PreEditChange(nullptr);
     	FAssetRegistryModule::AssetCreated(Texture2D);
 
+    	bool IsNormalMap = false;
 	    switch (LODGroup)
 	    {
 	    case ELegacyTextureGroup::TEXTUREGROUP_World:
@@ -91,6 +90,7 @@ UObject* ULegacyTexture2D::ExportToContent()
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_WorldNormalMap:
 	    	Texture2D->LODGroup = TEXTUREGROUP_WorldNormalMap;
+	    	IsNormalMap = true;
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_WorldSpecularColor:
 	    case ELegacyTextureGroup::TEXTUREGROUP_WorldSpecular:
@@ -101,6 +101,7 @@ UObject* ULegacyTexture2D::ExportToContent()
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_CharacterNormalMap:
 	    	Texture2D->LODGroup = TEXTUREGROUP_CharacterNormalMap;
+	    	IsNormalMap = true;
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_CharacterSpecularColor:
 	    case ELegacyTextureGroup::TEXTUREGROUP_CharacterSpecular:
@@ -111,8 +112,10 @@ UObject* ULegacyTexture2D::ExportToContent()
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_WeaponNormalMap:
 	    	Texture2D->LODGroup = TEXTUREGROUP_WeaponNormalMap;
+	    	IsNormalMap = true;
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_WeaponSpecular:
+	    case ELegacyTextureGroup::TEXTUREGROUP_WeaponSpecularColor:
 	    	Texture2D->LODGroup = TEXTUREGROUP_WeaponSpecular;
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_Vehicle:
@@ -120,6 +123,7 @@ UObject* ULegacyTexture2D::ExportToContent()
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_VehicleNormalMap:
 	    	Texture2D->LODGroup = TEXTUREGROUP_VehicleNormalMap;
+	    	IsNormalMap = true;
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_VehicleSpecular:
 	    	Texture2D->LODGroup = TEXTUREGROUP_VehicleSpecular;
@@ -174,6 +178,7 @@ UObject* ULegacyTexture2D::ExportToContent()
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_WorldGroundNormal:
 	    	Texture2D->LODGroup = TEXTUREGROUP_WorldNormalMap;
+	    	IsNormalMap = true;
 		    break;
 	    case ELegacyTextureGroup::TEXTUREGROUP_WorldGround:
 	    	Texture2D->LODGroup = TEXTUREGROUP_World;
@@ -183,7 +188,11 @@ UObject* ULegacyTexture2D::ExportToContent()
 	    	break;
 	    default: ;
 	    }
-    	if (Texture2D->LODGroup == TEXTUREGROUP_WorldNormalMap)
+    	
+    	RedImageTool::RedImage Image;
+    	ExportTo(Image,&IsHDR,IsNormalMap);
+    	
+    	if (IsNormalMap)
     	{
     		Texture2D->CompressionSettings = TC_Normalmap;
     	} 
@@ -191,6 +200,8 @@ UObject* ULegacyTexture2D::ExportToContent()
     	{
     		Texture2D->CompressionSettings = TC_HDR;
     	}
+    	
+    	
     	Texture2D->Source.Init(Image.GetWidth(), Image.GetHeight(), 1, Image.GetMips(), IsHDR?TSF_RGBA16F:TSF_BGRA8, static_cast<uint8*>(*Image));
         Texture2D->PostEditChange();
         Texture2D->Modify();
@@ -200,7 +211,7 @@ UObject* ULegacyTexture2D::ExportToContent()
     return Texture2D;
 }
 
-void ULegacyTexture2D::ExportTo(RedImageTool::RedImage& Image,bool*IsHDR)
+void ULegacyTexture2D::ExportTo(RedImageTool::RedImage& Image,bool*IsHDR,bool bIsNormaMap)
 {
 	int32 MipStart = 0;
 	for(MipStart = 0 ;MipStart<Mips.Num();MipStart++)
@@ -218,52 +229,57 @@ void ULegacyTexture2D::ExportTo(RedImageTool::RedImage& Image,bool*IsHDR)
 	Image.Create(Mips[MipStart].SizeX,Mips[MipStart].SizeY,Mips.Num()-MipStart,1,PixelFormat);
 
 	uint8* PixelData = static_cast<uint8*>(*Image);
-	for(int32 i = MipStart ;i<Mips.Num();i++)
+	for (int32 i = MipStart; i < Mips.Num(); i++)
 	{
-		if(!Mips[i].Data.BulkData)
+		if (!Mips[i].Data.BulkData)
 		{
-			Mips[i].Data.LoadFromFile(TextureFileCacheName.ToString() );
+			Mips[i].Data.LoadFromFile(TextureFileCacheName.ToString());
 		}
-		if(Mips[i].Data.BulkData)
+		if (Mips[i].Data.BulkData)
 		{
-			FMemory::Memcpy(PixelData,Mips[i].Data.BulkData,Mips[i].Data.ElementCount);
+			FMemory::Memcpy(PixelData, Mips[i].Data.BulkData, Mips[i].Data.ElementCount);
 		}
-		PixelData+=Mips[i].Data.ElementCount;
+		PixelData += Mips[i].Data.ElementCount;
 	}
+
 	switch (PixelFormat)
 	{
-		case RedImageTool::RedTexturePixelFormat::BC5:
+	case RedImageTool::RedTexturePixelFormat::R8G8:
+	case RedImageTool::RedTexturePixelFormat::BC5:
+		if (bIsNormaMap)
+		{
+			//sqrt(max(1.0 - normal.x * normal.x - normal.y * normal.y, 0.0))
+			Image.Convert(RedImageTool::RedTexturePixelFormat::R32G32B32F);
+			FVector3f* Pixels = static_cast<FVector3f*>(*Image);
+			for (size_t d = 0; d < Image.GetDepth(); d++)
 			{
-				//sqrt(max(1.0 - normal.x * normal.x - normal.y * normal.y, 0.0))
-				Image.Convert(RedImageTool::RedTexturePixelFormat::R32G32B32F);
-				FVector3f* Pixels = static_cast<FVector3f*>(*Image);
-				for (size_t d = 0; d < Image.GetDepth(); d++)
+				for (size_t i = 0; i < Image.GetMips(); i++)
 				{
-					for (size_t i = 0; i < Image.GetMips(); i++)
+					size_t MipWidth = RedImageTool::RedTextureUtils::GetMip(Image.GetWidth(), i);
+					size_t MipHeight = RedImageTool::RedTextureUtils::GetMip(Image.GetHeight(), i);
+					for (size_t x = 0; x < MipWidth * MipHeight; x++)
 					{
-						size_t MipWidth = RedImageTool::RedTextureUtils::GetMip(Image.GetWidth(), i);
-						size_t MipHeight = RedImageTool::RedTextureUtils::GetMip(Image.GetHeight(), i);
-						for (size_t x = 0; x<MipWidth*MipHeight; x++)
-						{
-							Pixels[x].X = Pixels[x].X*2 - 1.f;
-							Pixels[x].Y = Pixels[x].Y*2 - 1.f;
-							Pixels[x].Z = FMath::Sqrt(FMath::Max(1.f - 	Pixels[x].X*	Pixels[x].X-	Pixels[x].Y*	Pixels[x].Y,0.f));
-							Pixels[x] = Pixels[x].GetSafeNormal();
-							
-							Pixels[x].X = Pixels[x].X + 1.f;
-							Pixels[x].Y = Pixels[x].Y + 1.f;
-							Pixels[x].Z = Pixels[x].Z + 1.f;
-							Pixels[x] *= 0.5f;
-						}
-						Pixels += MipWidth*MipHeight;
+						Pixels[x].X = Pixels[x].X * 2 - 1.f;
+						Pixels[x].Y = Pixels[x].Y * 2 - 1.f;
+						Pixels[x].Z = FMath::Sqrt(FMath::Max(1.f - Pixels[x].X * Pixels[x].X - Pixels[x].Y * Pixels[x].Y, 0.f));
+						Pixels[x] = Pixels[x].GetSafeNormal();
+
+						Pixels[x].X = Pixels[x].X + 1.f;
+						Pixels[x].Y = Pixels[x].Y + 1.f;
+						Pixels[x].Z = Pixels[x].Z + 1.f;
+						Pixels[x] *= 0.5f;
 					}
+					Pixels += MipWidth * MipHeight;
 				}
-				Image.Convert(RedImageTool::RedTexturePixelFormat::R8G8B8A8);
-				Image.SwapRB();
 			}
-			break;
+			Image.Convert(RedImageTool::RedTexturePixelFormat::R8G8B8A8);
+			//Image.SwapRB();
+		}
+		break;
+	default:
+		break;
 	}
-	if(*IsHDR)
+	if (*IsHDR)
 	{
 		Image.Convert(RedImageTool::RedTexturePixelFormat::R32G32B32A32F);
 	}

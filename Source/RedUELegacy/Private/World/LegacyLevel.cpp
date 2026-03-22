@@ -9,6 +9,7 @@
 #include "Kismet/Base/LegacyKismet.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Mesh/LegacyModel.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "World/LegacyWorld.h"
 #include "World/Sequences/LegacySequence.h"
@@ -72,5 +73,10 @@ void ULegacyLevel::ImportLevel(bool ReimportKismet)
             Sequence->FillActor(LevelKismet);
             
         }
+    }
+    if (Model)
+    {
+        ABrush*BrushActor = GWorld->SpawnActor<ABrush>();
+        Model->Fill(BrushActor);
     }
 }

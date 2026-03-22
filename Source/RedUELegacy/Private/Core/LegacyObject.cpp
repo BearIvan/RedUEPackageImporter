@@ -43,12 +43,12 @@ bool FLegacyMatrix::Serialize(FArchive& Ar)
 	return true;
 }
 
-FLegacyMatrix::operator FMatrix44f()
+FLegacyMatrix::operator FMatrix44f() const
 {
 	return Data;
 }
 
-FLegacyMatrix::operator FMatrix()
+FLegacyMatrix::operator FMatrix() const
 {
 	
 	return FMatrix(Data);
@@ -94,11 +94,11 @@ struct FPushedState
 void ULegacyObject::LegacySerialize(FRedUELegacyArchive& Ar)
 {
 	constexpr int64 RF_HasStack = 0x0200000000000000ull;
-	// if (GetLegacyFullName() == TEXT("TheWorld.PersistentLevel.XReactiveSkeletalMeshActor2.XSkeletalMeshComponent0"))
-	// {
-	// 	__nop();
-	// }
-    if (LegacyObjectFlags&RF_HasStack)
+	 if (GetLegacyFullName() == TEXT("TheWorld.PersistentLevel.XWorldInfo6"))
+	 {
+	 	__nop();
+	 }
+    if (LegacyObjectFlags&RF_HasStack && Ar.Game != ERedUELegacyGame::Bioshock3)
     {
         int32 Node;
         UStruct*StateNode;
@@ -201,6 +201,7 @@ enum class EFLegacyPropType:int32
 static FName NAME_StringProperty = "StringProperty";
 static FName NAME_ClassProperty = "ClassProperty";
 static FName NAME_FixedArrayProperty = "FixedArrayProperty";
+static FName NAME_XWeakReferenceProperty = "XWeakReferenceProperty";
 
 struct FLegacyPropertyTag
 {
@@ -209,7 +210,7 @@ struct FLegacyPropertyTag
     FName		StructName;
     int32		ArrayIndex;
     int32		DataSize;
-    int32		BoolValue;
+    int32		BoolValue = 0;
     FName		EnumName;			// UE3 ver >= 633
 
     
@@ -242,7 +243,7 @@ struct FLegacyPropertyTag
         { static_cast<int32>(EFLegacyPropType::FixedArrayProperty), NAME_FixedArrayProperty },
         { static_cast<int32>(EFLegacyPropType::DelegateProperty), NAME_DelegateProperty },
         { static_cast<int32>(EFLegacyPropType::InterfaceProperty), NAME_InterfaceProperty },
-        { static_cast<int32>(EFLegacyPropType::XWeakReferenceProperty), "XWeakReferenceProperty" },
+        { static_cast<int32>(EFLegacyPropType::XWeakReferenceProperty), NAME_XWeakReferenceProperty },
         };
 	    
 		Ar << Tag.Name;
@@ -410,6 +411,19 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
             }
         }
     	else if(Tag.Type == NAME_NameProperty)
+    	{
+    		if(FNameProperty* NameProperty = CastField<FNameProperty>(Property))
+    		{
+    			FName InString;
+    			Ar << InString;
+    			NameProperty->SetPropertyValue_InContainer(Object,InString,Tag.ArrayIndex);
+    		}
+    		else
+    		{
+    			TypeMismatch();
+    		}
+    	}
+    	else if(Tag.Type == NAME_XWeakReferenceProperty)
     	{
     		if(FNameProperty* NameProperty = CastField<FNameProperty>(Property))
     		{

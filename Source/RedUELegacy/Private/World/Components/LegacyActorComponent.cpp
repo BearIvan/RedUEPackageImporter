@@ -8,6 +8,5 @@ void ULegacyActorComponent::LegacySerializeComponent(FArchive& Ar)
 
 void ULegacyActorComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
 {
-    
     InActorComponent->bAutoActivate = bAutoActivate;
 }

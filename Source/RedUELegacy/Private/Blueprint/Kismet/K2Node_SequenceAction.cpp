@@ -83,6 +83,10 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 	InputEventsName = NAME_None;
 	UClass*ActionClass = Action->GetClass();
 	
+	LegacyIndexToInputPin.Empty();
+	LegacyIndexToOutputPin.Empty();
+	LegacyIndexToVariableName.Empty();
+	CustomLinkToIndex.Empty();
 	for (TFieldIterator<UFunction>  FunctionIT(ActionClass); FunctionIT; ++FunctionIT)
 	{
 		if ( FunctionIT->HasMetaData(TEXT("KismetInput")) && (FunctionIT->FunctionFlags & FUNC_BlueprintCallable))
@@ -95,10 +99,35 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 		}
 	}
 
+	
 	for (TFieldIterator<FProperty> PropertyIt(ActionClass); PropertyIt; ++PropertyIt)
 	{
+		if (FIntProperty* LinkProperty = CastField<FIntProperty>(*PropertyIt))
+		{
+			if (LinkProperty->HasMetaData(TEXT("KismetLinkCount")))
+			{
+				if (!ensure(LegacyIndexToOutputPin.Num() == 0))
+				{
+					LegacyIndexToOutputPin.Empty();
+				}
+				int32 LinkCount = *LinkProperty->GetPropertyValuePtr_InContainer(Action);
+				for (int32 LinkIndex = 0; LinkIndex < LinkCount; ++LinkIndex)
+				{
+					UEdGraphPin* LinkPin = CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Exec,*FString::Printf(TEXT("Link %d"),LinkIndex));
+					LinkPin->PinToolTip = FString::Printf(TEXT("Link %d"),LinkIndex);
+					LinkPin->PinFriendlyName = FText::AsCultureInvariant(FString::Printf(TEXT("Link %d"),LinkIndex));
+					CustomLinkToIndex.Add(LinkPin->GetFName(),LinkIndex);
+					LegacyIndexToOutputPin.Add(LinkIndex,LinkPin->GetFName());
+				}
+			}
+		}
 		if (FMulticastDelegateProperty* Property = CastField<FMulticastDelegateProperty>(*PropertyIt))
 		{
+			if (!ensure(CustomLinkToIndex.IsEmpty()))
+			{
+				CustomLinkToIndex.Empty();
+				LegacyIndexToOutputPin.Empty();
+			}
 			UEdGraphPin* ExecPin = CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Exec, Property->GetFName());
 			ExecPin->PinToolTip = Property->GetToolTipText().ToString();
 			ExecPin->PinFriendlyName = Property->GetDisplayNameText();
@@ -212,14 +241,27 @@ void UK2Node_SequenceAction::ExpandNode(FKismetCompilerContext& CompilerContext,
 		}
 		if (CurrentPin && CurrentPin->Direction == EGPD_Output && CurrentPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Exec&& CurrentPin->LinkedTo.Num() > 0)
 		{
-			if (FMulticastDelegateProperty* DelegateProperty =  CastField<FMulticastDelegateProperty>(ActionClass->FindPropertyByName(CurrentPin->PinName)))
+			if (CustomLinkToIndex.Num() > 0)
 			{
 				UK2Node_CustomEvent* CurrentCENode = CompilerContext.SpawnIntermediateNode<UK2Node_CustomEvent>(this, SourceGraph);
 				CurrentCENode->CustomFunctionName = *FString::Printf(TEXT("%s_%s"), *CurrentPin->GetName(), *CompilerContext.GetGuid(this));
 				CurrentCENode->AllocateDefaultPins();
 				bIsErrorFree &= CompilerContext.MovePinLinksToIntermediate(*CurrentPin, *CurrentCENode->FindPinChecked(UEdGraphSchema_K2::PN_Then)).CanSafeConnect();
 				Action->InitializeDelegates.Add(CurrentPin->PinName,CurrentCENode->CustomFunctionName);
+				Action->InitializeCustomLinks.Add(CustomLinkToIndex[CurrentPin->PinName],CurrentCENode->CustomFunctionName);
 			}
+			else
+			{
+				if (FMulticastDelegateProperty* DelegateProperty =  CastField<FMulticastDelegateProperty>(ActionClass->FindPropertyByName(CurrentPin->PinName)))
+				{
+					UK2Node_CustomEvent* CurrentCENode = CompilerContext.SpawnIntermediateNode<UK2Node_CustomEvent>(this, SourceGraph);
+					CurrentCENode->CustomFunctionName = *FString::Printf(TEXT("%s_%s"), *CurrentPin->GetName(), *CompilerContext.GetGuid(this));
+					CurrentCENode->AllocateDefaultPins();
+					bIsErrorFree &= CompilerContext.MovePinLinksToIntermediate(*CurrentPin, *CurrentCENode->FindPinChecked(UEdGraphSchema_K2::PN_Then)).CanSafeConnect();
+					Action->InitializeDelegates.Add(CurrentPin->PinName,CurrentCENode->CustomFunctionName);
+				}
+			}
+			
 		}
 	}
 	if (FArrayProperty* InputEventsProperty =  CastField<FArrayProperty>(ActionClass->FindPropertyByName(InputEventsName)))
@@ -396,7 +438,6 @@ bool UK2Node_SequenceAction::CanAddEventPin() const
 
 void UK2Node_SequenceAction::AddEventPin()
 {
-	const FScopedTransaction Transaction( NSLOCTEXT("RedUELegacy","AddSequenceActionEvent_Transaction","Add Event Input") );
 	Modify();
 	CreateEventPin();
 

@@ -20,6 +20,9 @@ struct FLegacySeqOpInputLink
 	FString LinkDesc;
 	
 	UPROPERTY(BlueprintReadWrite)
+	FName XLinkName;
+	
+	UPROPERTY(BlueprintReadWrite)
 	bool bHasImpulse;
 	
 	UPROPERTY(BlueprintReadWrite)
@@ -204,6 +207,12 @@ UCLASS()
 class REDUELEGACY_API ULegacySequenceObject : public ULegacyObject
 {
 	GENERATED_BODY()
+public:
+	virtual UK2Node* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph);
+	
+protected:
+	UPROPERTY(Transient)
+	UK2Node* CurrentNode = nullptr;
 };
 
 UCLASS()
@@ -211,10 +220,11 @@ class REDUELEGACY_API ULegacySequenceOp : public ULegacySequenceObject
 {
 	GENERATED_BODY()
 public:
-	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph);
 	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph);
 	virtual UEdGraphPin*			GetEventPin			(UBlueprint* InBlueprint,UEdGraph* InGraph);
-	virtual void					SimulatedImport	();
+	virtual void					SimulatedImport		();
+	static	void					FillPin				(UBlueprint* InBlueprint, UEdGraph* InGraph, const FLegacySeqOpOutputLink& LegacySeqOpOutputLink, UEdGraphPin* OutputPin);
+	
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<FLegacySeqOpInputLink> InputLinks;
@@ -227,10 +237,6 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<FLegacySeqEventLink> EventLinks;
-	
-protected:
-	UPROPERTY(Transient)
-	UK2Node_SequenceAction* CurrentNode = nullptr;
 };
 
 UCLASS()
@@ -239,9 +245,8 @@ class REDUELEGACY_API ULegacySequenceImporter : public ULegacySequenceOp
 	GENERATED_BODY()
 public:
 	virtual void					FillAction						(class USequenceAction* InSequenceAction);
-	virtual UK2Node_SequenceAction* ExportToBlueprint				(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
-	virtual void					PreLegacySerializeUnrealProps	(FRedUELegacyArchive& Ar);
-			void					FillPin							(UBlueprint* InBlueprint, UEdGraph* InGraph, const FLegacySeqOpOutputLink& LegacySeqOpOutputLink, UEdGraphPin* OutputPin);
+	virtual UK2Node*				ExportToBlueprint				(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void					PreLegacySerializeUnrealProps	(FRedUELegacyArchive& Ar) override;
 
 	UPROPERTY(Transient)
 	class USequenceAction* ToAction = nullptr;
@@ -314,6 +319,41 @@ public:
 
 
 UCLASS()
+class ULegacySeqAct_FinishSequence: public ULegacySequenceAction
+{
+	GENERATED_BODY()
+public:
+	
+	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UEdGraphPin*			GetEventPin			(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UK2Node*				ExportToBlueprint	(UBlueprint* InBlueprint, UEdGraph* InGraph) override;
+	
+	UPROPERTY(Transient)
+	FName InputPinName;
+	
+	UPROPERTY(Transient)
+	UK2Node* CurrentTunnelNode = nullptr;
+};
+
+UCLASS()
+class ULegacySeqEvent_SequenceActivated: public ULegacySequenceOp
+{
+	GENERATED_BODY()
+public:
+	
+	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UEdGraphPin*			GetEventPin			(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UK2Node*				ExportToBlueprint	(UBlueprint* InBlueprint, UEdGraph* InGraph) override;
+	
+	UPROPERTY(Transient)
+	FName OutputPinName;
+	
+	UPROPERTY(Transient)
+	UK2Node* CurrentTunnelNode = nullptr;
+};
+
+
+UCLASS()
 class ULegacySequenceVariable : public ULegacySequenceObject
 {
 	GENERATED_BODY()
@@ -364,8 +404,20 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	int32 IntValue;
+};
+
+UCLASS()
+class REDUELEGACY_API ULegacySeqVar_Float : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	float FloatValue;
 	
 };
+
 
 UCLASS()
 class REDUELEGACY_API ULegacySeqVar_Named: public ULegacySequenceVariable
@@ -389,12 +441,27 @@ class REDUELEGACY_API ULegacySeqVar_ObjectList : public ULegacySequenceVariable
 	GENERATED_BODY()
 public:
 	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
-	virtual void						Fill					(ALegacyKismet* Kismet);
+	virtual void						Fill					(ALegacyKismet* Kismet) override;
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<ULegacyObject*> ObjList;
 	
 };
+
+UCLASS()
+class REDUELEGACY_API ULegacySeqVar_External : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual void						Fill					(ALegacyKismet* Kismet) override;
+	
+	UPROPERTY(Transient)
+	TArray<ULegacySequenceVariable*> Variables;
+};
+
+
+
 
 UCLASS()
 class REDUELEGACY_API ULegacyXSeqVar_PlayerController : public ULegacySequenceVariable
@@ -416,7 +483,7 @@ public:
 	
 };
 UCLASS()
-class REDUELEGACY_API ULegacyXSeqVar_SinglePlayerController : public ULegacySequenceVariable
+class REDUELEGACY_API ULegacyXSeqVar_SinglePlayerController : public ULegacyXSeqVar_PlayerController
 {
 	GENERATED_BODY()
 };
@@ -474,7 +541,7 @@ class REDUELEGACY_API ULegacySeqAct_Interp : public ULegacySequenceImporter
 	GENERATED_BODY()
 public:
 									ULegacySeqAct_Interp();
-	virtual UK2Node_SequenceAction* ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UK2Node*				ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	virtual UEdGraphPin*			GetInputPin			(int32 Index,UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	
 	virtual void					SimulatedImport	() override;
@@ -594,7 +661,7 @@ class REDUELEGACY_API ULegacyXSeqAct_InstancePattern : public ULegacySequenceImp
 public:
 	ULegacyXSeqAct_InstancePattern();
 
-	virtual UK2Node_SequenceAction* 	ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	virtual UK2Node* 					ExportToBlueprint	(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	virtual void						FillAction			(USequenceAction* InSequenceAction) override;
 
 	UPROPERTY(BlueprintReadWrite)

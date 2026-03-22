@@ -27,22 +27,22 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Targets;
 
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Targets);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Targets);
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1))
 	AActor* StartPosition;
 	
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(AActor*,StartPosition);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(StartPosition);
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 2))
 	AActor* LookAtActor;
 	
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(AActor*,LookAtActor);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(LookAtActor);
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 3))
 	AActor* HandsMeshTargets;
 	
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(AActor*,HandsMeshTargets)
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(HandsMeshTargets)
 
 	UPROPERTY(BlueprintReadWrite,EditAnywhere)
 	float MovePlayerDuration = 0.f;

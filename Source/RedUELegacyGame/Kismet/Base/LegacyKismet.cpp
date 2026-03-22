@@ -24,7 +24,16 @@ void ALegacyKismet::BeginPlay()
 			NewAction->Construct();
 			if (USeqEvent_RemoteEvent* RemoveEvent = Cast<USeqEvent_RemoteEvent>(NewAction))
 			{
-				SequenceRemoteEvents.Add(RemoveEvent->EventName,RemoveEvent);
+				if (USeqEvent_RemoteEvent** RemoteEvent = SequenceRemoteEvents.Find(RemoveEvent->EventName))
+				{
+					USeqEvent_RemoteEvent* CurrentEvent = *RemoteEvent;
+					for (;CurrentEvent->NextEvent;CurrentEvent = CurrentEvent->NextEvent){}
+					CurrentEvent->NextEvent = RemoveEvent;
+				}
+				else
+				{
+					SequenceRemoteEvents.Add(RemoveEvent->EventName,RemoveEvent);
+				}
 			}
 		}
 	}
@@ -42,22 +51,39 @@ void ALegacyKismet::Tick(float DeltaTime)
 		}
 		bFirstTick = true;
 	}
-	Super::Tick(DeltaTime);
-	for (auto & [Key,Value] :SequenceActions)
+	else
 	{
-		Value->Tick(DeltaTime);
+		TArray<FName> InRemoteEventNames;
+		Swap(RemoteEventNames,InRemoteEventNames);
+		for (const FName& InName : InRemoteEventNames)
+		{
+			if (USeqEvent_RemoteEvent** RemoteEvent = SequenceRemoteEvents.Find(InName))
+			{
+				USeqEvent_RemoteEvent* CurrentEvent = *RemoteEvent;
+				for (;CurrentEvent;CurrentEvent = CurrentEvent->NextEvent)
+				{
+					if (CurrentEvent->bEnabled)
+					{
+						CurrentEvent->Out.Broadcast();
+					}
+				}
+			}
+		}
+		
+		Super::Tick(DeltaTime);
+		for (auto & [Key,Value] :SequenceActions)
+		{
+			Value->Tick(DeltaTime);
+		}
 	}
+	
+
+	
 }
 
 void ALegacyKismet::ActivateRemoteEvent(const FName& InName)
 {
-	if (USeqEvent_RemoteEvent** RemoteEvent = SequenceRemoteEvents.Find(InName))
-	{
-		if ((*RemoteEvent)->bEnabled)
-		{
-			(*RemoteEvent)->Out.Broadcast();
-		}
-	}
+	RemoteEventNames.AddUnique(InName);
 }
 
 USequenceAction* ALegacyKismet::GetSequenceAction(FGuid ActionGuid, TSubclassOf<USequenceAction> SequenceActionClass)

@@ -59,7 +59,8 @@ enum class ELegacyTextureGroup
 	TEXTUREGROUP_WorldGround,
 	TEXTUREGROUP_Gobo,
 	TEXTUREGROUP_WorldSpecularColor,
-	TEXTUREGROUP_CharacterSpecularColor
+	TEXTUREGROUP_CharacterSpecularColor,
+	TEXTUREGROUP_WeaponSpecularColor
 };
 
 UCLASS()
@@ -70,7 +71,7 @@ public:
 	virtual void					LegacySerialize						(FRedUELegacyArchive& Ar) override;
 	virtual FName					GetLegacyClassName_Implementation	(ERedUELegacyEngineType EngineType, ERedUELegacyGameType GameType) override;
 	virtual UObject*				ExportToContent						() override;
-	void							ExportTo							(RedImageTool::RedImage& Image,bool*IsHDR = nullptr);
+	void							ExportTo							(RedImageTool::RedImage& Image,bool*IsHDR = nullptr,bool bIsNormaMap = false);
 	FGuid							TextureFileCacheGuid;
 	TArray<FLegacyTexture2DMipMap>	Mips;
 	

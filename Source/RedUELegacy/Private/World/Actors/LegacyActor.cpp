@@ -66,6 +66,12 @@ UClass* ULegacyWorldInfo::GetActorClass_Implementation()
 	return nullptr;
 }
 
+UClass* ULegacyPlayerStart::GetActorClass_Implementation()
+{
+	return APlayerStart::StaticClass();
+}
+
+
 void ULegacyXWorldInfo::GetStreamingLevels(TArray<ULegacyLevelStreaming*>& OutStreamingLevels)
 {
 	OutStreamingLevels = StreamingLevelsWrapper.StreamingLevels;
@@ -104,7 +110,10 @@ void ULegacyEmitter::FillActor_Implementation(AActor* InActor)
 {
 	if (AEmitter* InEmitter = CastChecked<AEmitter>(InActor))
 	{
-		ParticleSystemComponent->FillComponent(InEmitter->GetParticleSystemComponent());
+		if (ParticleSystemComponent)
+		{
+			ParticleSystemComponent->FillComponent(InEmitter->GetParticleSystemComponent());
+		}
 	}
 }
 

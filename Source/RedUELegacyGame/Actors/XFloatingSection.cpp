@@ -19,6 +19,7 @@ AXFloatingSection::AXFloatingSection()
 void AXFloatingSection::BeginPlay()
 {
 	Super::BeginPlay();
+	InitialTransform = GetActorTransform();
 	
 	for (FName LevelName:LevelNames)
 	{
@@ -31,6 +32,13 @@ void AXFloatingSection::BeginPlay()
 	}
 	
 	LevelAddedToWorld(nullptr,nullptr);
+	OnLevelAddedToWorld =  FWorldDelegates::LevelAddedToWorld.AddUObject(this, &ThisClass::LevelAddedToWorld);
+}
+
+void AXFloatingSection::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	FWorldDelegates::LevelAddedToWorld.Remove(OnLevelAddedToWorld);
+	Super::EndPlay(EndPlayReason);
 }
 
 void AXFloatingSection::LevelAddedToWorld(ULevel* Level, UWorld* World)
@@ -38,19 +46,20 @@ void AXFloatingSection::LevelAddedToWorld(ULevel* Level, UWorld* World)
 	for (int32  i = 0; i < Levels.Num(); i++)
 	{
 		ULevelStreaming*LevelStreaming = Levels[i];
-		if (LevelStreaming[i].IsLevelLoaded() != IsLoadedLevels[i])
+		if (LevelStreaming[i].IsLevelVisible() != IsLoadedLevels[i])
 		{
-			if (LevelStreaming[i].IsLevelLoaded())
+			if (LevelStreaming[i].IsLevelVisible())
 			{
 				for (AActor* Actor : LevelStreaming->GetLoadedLevel()->Actors)
 				{
+					Actor->SetActorTransform(Actor->GetTransform()*(GetTransform()*InitialTransform.Inverse()));
 					Actor->AttachToActor(this,FAttachmentTransformRules::KeepWorldTransform);
 					// 
 					// Actor->SetActorTransform( NewTransform);
 				}
 			}
 		}
-		IsLoadedLevels[i] = LevelStreaming[i].IsLevelLoaded();
+		IsLoadedLevels[i] = LevelStreaming[i].IsLevelVisible();
 	}
 }
 

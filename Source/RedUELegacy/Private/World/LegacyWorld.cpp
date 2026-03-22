@@ -13,6 +13,7 @@
 #include "Editor/UnrealEdEngine.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingAlwaysLoaded.h"
+#include "LevelInstance/LevelInstanceLevelStreaming.h"
 
 void ULegacyWorld::LegacySerialize(FRedUELegacyArchive& Ar)
 {
@@ -41,7 +42,7 @@ void ULegacyWorld::ImportLevel(bool ReimportKismet)
 void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, bool AllowAlwaysLoadingLevel,bool ImportPersistentLevel,bool ReimportKismet)
 {
 	URedUELegacySubsystem* RedUELegacySubsystem = GEditor->GetEditorSubsystem<URedUELegacySubsystem>();
-	auto FindOrCreateLevel = [this,RedUELegacySubsystem](FName InLevelName, bool& NeedOverride)-> ULevel*
+	auto FindOrCreateLevel = [this,RedUELegacySubsystem](FName InLevelName, bool& NeedOverride,bool IsKismetStreaming)-> ULevel*
 	{
 		UWorld* WorkingWorld = GWorld;
 		FString LevelPackageName = FPaths::Combine(RedUELegacySubsystem->OutContentPath, InLevelName.ToString());
@@ -76,7 +77,7 @@ void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, 
 		if (FPaths::FileExists(PackageFilename) || LevelSoftObjectPath.ResolveObject())
 		{
 			FTransform LevelTransform;
-			StreamingLevel = UEditorLevelUtils::AddLevelToWorld(WorkingWorld, *LevelPackageName, ULevelStreamingAlwaysLoaded::StaticClass(), LevelTransform);
+			StreamingLevel = UEditorLevelUtils::AddLevelToWorld(WorkingWorld, *LevelPackageName, IsKismetStreaming ? ULevelStreamingDynamic::StaticClass() :  ULevelStreamingAlwaysLoaded::StaticClass(), LevelTransform);
 			if (StreamingLevel)
 			{
 				WorkingWorld->LoadSecondaryLevels();
@@ -95,7 +96,7 @@ void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, 
 		// If it does not exist, create a new one and add it to the working world
 		else
 		{
-			StreamingLevel = EditorLevelUtils::CreateNewStreamingLevelForWorld(*WorkingWorld, ULevelStreamingAlwaysLoaded::StaticClass(), PackageFilename, false, nullptr, false);
+			StreamingLevel = EditorLevelUtils::CreateNewStreamingLevelForWorld(*WorkingWorld, IsKismetStreaming ? ULevelStreamingDynamic::StaticClass() :ULevelStreamingAlwaysLoaded::StaticClass(), PackageFilename, false, nullptr, false);
 
 			if (StreamingLevel)
 			{
@@ -148,6 +149,7 @@ void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, 
 	{
 		if (ULegacyWorldInfo* WorldInfo = Cast<ULegacyWorldInfo>(Actor))
 		{
+			PersistentLevel->WorldInfo = WorldInfo;
 			TArray<ULegacyLevelStreaming*> StreamingLevels;
 			WorldInfo->GetStreamingLevels(StreamingLevels);
 			for (ULegacyLevelStreaming* StreamingLevel : StreamingLevels)
@@ -179,14 +181,14 @@ void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, 
 							if (ULegacyWorld* LegacyWorld = Cast<ULegacyWorld>(SubLevelLegacyPackage->GetOrCreateExport(TheWorldIndex)))
 							{
 								bool NeedOverride = false;
-								if (ULevel* Level = FindOrCreateLevel(StreamingLevel->PackageName, NeedOverride))
+								if (ULevel* Level = FindOrCreateLevel(StreamingLevel->PackageName, NeedOverride,StreamingLevel->IsA<ULegacyLevelStreamingKismet>() ))
 								{
 									GWorld->SetCurrentLevel(Level);
 									if (NeedOverride)
 									{
 										TArray<AActor*> Actors = Level->Actors;
 										Actors.Remove(nullptr);
-										GUnrealEd->DeleteActors(Actors, GWorld, GUnrealEd->GetSelectedActors()->GetElementSelectionSet());
+										GUnrealEd->DeleteActors(Actors, GWorld, GUnrealEd->GetSelectedActors()->GetElementSelectionSet(),false,false,false);
 									}
 
 									LegacyWorld->ImportLevel(ReimportKismet);
@@ -224,6 +226,7 @@ void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, 
 					}
 				}
 			}
+			GEditor->RebuildAlteredBSP();
 			return;
 		}
 	}

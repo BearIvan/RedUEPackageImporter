@@ -152,6 +152,7 @@ UParticleModule* ULegacyParticleModule::Export(UParticleSystem* ParticleSystem)
 
 UParticleModule* ULegacyParticleModuleRequired::Export(UParticleSystem* ParticleSystem)
 {
+	
 	UParticleModuleRequired* ParticleModuleRequired = NewObject<UParticleModuleRequired>(ParticleSystem,NAME_None);
 	if (Material)
 	{
@@ -171,7 +172,6 @@ UParticleModule* ULegacyParticleModuleRequired::Export(UParticleSystem* Particle
 
 UParticleModule* ULegacyParticleModuleSpawn::Export(UParticleSystem* ParticleSystem)
 {
-	
 	UParticleModuleSpawn* ParticleModuleSpawn = NewObject<UParticleModuleSpawn>(ParticleSystem,NAME_None);
 	ParticleModuleSpawn->LODValidity = LODValidity;
 	ParticleModuleSpawn->bEnabled = bEnabled;

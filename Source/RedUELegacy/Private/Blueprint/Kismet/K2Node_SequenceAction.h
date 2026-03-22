@@ -42,6 +42,9 @@ public:
 	TMap<int32,FName> LegacyIndexToOutputPin;
 	
 	UPROPERTY()
+	TMap<FName,int32> CustomLinkToIndex;
+	
+	UPROPERTY()
 	TMap<int32,FName> LegacyIndexToVariableName;
 
 	UPROPERTY()

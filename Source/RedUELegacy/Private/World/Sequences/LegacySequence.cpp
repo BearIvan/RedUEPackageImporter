@@ -1,6 +1,7 @@
 ﻿#include "World/Sequences/LegacySequence.h"
 
 #include "BlueprintCompilationManager.h"
+#include "K2Node_Composite.h"
 #include "ObjectTools.h"
 #include "PackageTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -115,13 +116,13 @@ void ULegacySequence::FillActor(ALegacyKismet* LevelKismet)
 	}
 }
 
-void ULegacySequence::GenerateBlueprint(ULegacyKismetBlueprint* InBlueprint,UEdGraph* EventGraph)
+void ULegacySequence::GenerateBlueprint(UBlueprint* InBlueprint,UEdGraph* EventGraph)
 {
 	for(ULegacySequenceObject* SequenceObject : SequenceObjects)
 	{
-		if(ULegacySequenceOp* SequenceEvent = Cast<ULegacySequenceOp>(SequenceObject))
+		if (SequenceObject)
 		{
-			SequenceEvent->ExportToBlueprint(InBlueprint,EventGraph);
+			SequenceObject->ExportToBlueprint(InBlueprint,EventGraph);
 		}
 	}
 
@@ -151,6 +152,123 @@ void ULegacySequence::GenerateBlueprint(ULegacyKismetBlueprint* InBlueprint,UEdG
 			SortNode(LinkNode,SortedNodes,Y,X);
 		}
 	}
+}
+
+UK2Node* ULegacySequence::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	if (CurrentNode)
+	{
+		return CurrentNode;
+	}
+	
+	if (SequenceObjects.IsEmpty())
+	{
+		return nullptr;
+	}
+	
+	FGraphNodeCreator<UK2Node_Composite> NodeCreator(*InGraph);
+	UK2Node_Composite* CompositeNode = NodeCreator.CreateNode();
+
+	CompositeNode->bCommentBubblePinned = true;
+	CompositeNode->NodeComment = GetLegacyFullName();
+	//CompositeNode->OnUpdateCommentText(GetLegacyFullName());
+	NodeCreator.Finalize();
+	
+	{
+		// Rename the graph to the correct name
+		UEdGraph* DestinationGraph = CompositeNode->BoundGraph;
+		TSharedPtr<INameValidatorInterface> NameValidator = MakeShareable(new FKismetNameValidator(InBlueprint, GetLegacyFName()));
+		FBlueprintEditorUtils::RenameGraphWithSuggestion(DestinationGraph, NameValidator, GetLegacyName());
+	}
+	
+	FEdGraphPinType ExecPinType(UEdGraphSchema_K2::PC_Exec, NAME_None, nullptr, EPinContainerType::None, false, FEdGraphTerminalType());
+	
+	for (int32 i = 0; i < InputLinks.Num(); i++)
+	{
+		const FLegacySeqOpInputLink& InputLink = InputLinks[i];
+		if (ULegacySeqEvent_SequenceActivated* SeqEvent_SequenceActivated = Cast<ULegacySeqEvent_SequenceActivated>(InputLink.LinkedOp))
+		{
+			FName InputName = InputLink.XLinkName;
+			if (InputName == NAME_Name)
+			{
+				InputName = *InputLink.LinkDesc;
+			}
+			
+			UEdGraphPin* InputPin =  CompositeNode->CreateUserDefinedPin(InputName,ExecPinType, EGPD_Input, true);
+			
+			SeqEvent_SequenceActivated->OutputPinName = InputPin->GetFName();
+			SeqEvent_SequenceActivated->CurrentTunnelNode = CompositeNode->InputSinkNode;
+			LegacyIndexToInputPin.Add(i, SeqEvent_SequenceActivated->OutputPinName );
+		}
+	}
+	
+	TMap<int32, FName> LegacyIndexToOutputPin;
+	for (int32 i = 0; i < OutputLinks.Num(); i++)
+	{
+		const FLegacySeqOpOutputLink& OutputLink = OutputLinks[i];
+		if (ULegacySeqAct_FinishSequence* SeqAct_FinishSequence = Cast<ULegacySeqAct_FinishSequence>(OutputLink.LinkedOp))
+		{
+			FName InputName = OutputLink.XLinkName;
+			if (InputName == NAME_Name)
+			{
+				InputName = *OutputLink.LinkDesc;
+			}
+			
+			UEdGraphPin* InputPin =  CompositeNode->CreateUserDefinedPin(InputName,ExecPinType, EGPD_Output, true);
+			
+			SeqAct_FinishSequence->InputPinName = InputPin->GetFName();
+			SeqAct_FinishSequence->CurrentTunnelNode = CompositeNode->OutputSourceNode;
+			LegacyIndexToOutputPin.Add(i, SeqAct_FinishSequence->InputPinName );
+		}
+	}
+	
+	TMap<FName, ULegacySeqVar_External*> ExternalVarMap;
+	for(ULegacySequenceObject* SequenceObject : SequenceObjects)
+	{
+		if (ULegacySeqVar_External* ExternalVar = Cast<ULegacySeqVar_External>(SequenceObject))
+		{
+			ExternalVarMap.Add(ExternalVar->GetLegacyFName(), ExternalVar);
+		}
+	}
+	
+	for (int32 i = 0; i < VariableLinks.Num(); i++)
+	{
+		const FLegacySeqVarLink& VarLink = VariableLinks[i];
+		if (ULegacySeqVar_External** ExternalVar = ExternalVarMap.Find(VarLink.LinkVar))
+		{
+			(*ExternalVar)->Variables = VarLink.LinkedVariables;
+		}
+	}
+	
+	CompositeNode->ReconstructNode();
+	GenerateBlueprint(InBlueprint,CompositeNode->BoundGraph);
+	CurrentNode = CompositeNode;
+	
+	for (int32  i = 0;i<OutputLinks.Num();i++)
+	{
+		const FLegacySeqOpOutputLink& LegacySeqOpOutputLink = OutputLinks[i];
+		if (FName*OutputName = LegacyIndexToOutputPin.Find(i))
+		{
+			UEdGraphPin*OutputPin = CompositeNode->FindPinChecked(*OutputName);
+
+			FillPin(InBlueprint, InGraph, LegacySeqOpOutputLink, OutputPin);
+		}
+	}
+	
+	return CompositeNode;
+}
+
+UEdGraphPin* ULegacySequence::GetInputPin(int32 Index, UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	if (CurrentNode)
+	{
+		FName *InputName = LegacyIndexToInputPin.Find(Index);
+		if (ensure(InputName))
+		{
+			return CurrentNode->FindPinChecked(*InputName);
+		}
+	}
+	return nullptr;
 }
 
 UObject* ULegacySequence::ExportToContent()
@@ -209,6 +327,13 @@ ULegacySequenceVariable* ULegacySequence::FindSequenceVariable(FName InName)
 			if (SequenceVariable->VarName == InName)
 			{
 				return SequenceVariable;
+			}
+		}
+		else if (ULegacySequence* LegacySequence = Cast<ULegacySequence>(SequenceObject))
+		{
+			if (ULegacySequenceVariable* Result = LegacySequence->FindSequenceVariable(InName))
+			{
+				return Result;
 			}
 		}
 	}

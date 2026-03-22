@@ -40,8 +40,8 @@ struct FLegacyMatrix
 	GENERATED_BODY()
 
 	bool Serialize(FArchive& Ar);
-	operator FMatrix44f();
-	operator FMatrix();
+	operator FMatrix44f() const;
+	operator FMatrix() const;
 	FLegacyMatrix&operator=(const FMatrix44f& InData);
 	FMatrix44f Data;
 };
@@ -110,7 +110,7 @@ public:
     UFUNCTION(BlueprintNativeEvent)
     FName GetLegacyClassName(ERedUELegacyEngineType EngineType,ERedUELegacyGameType GameType);
     
-    UPROPERTY(Transient,BlueprintReadOnly,Category="Legacy")
+	UPROPERTY(Transient,BlueprintReadOnly,Category="Legacy")
     ULegacyPackage* LegacyPackage;
 
 	UPROPERTY(Transient,BlueprintReadOnly,Category="Legacy")

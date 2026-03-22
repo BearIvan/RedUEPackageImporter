@@ -15,13 +15,37 @@ public:
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Actors;
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Actors);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Actors);
 	
 	UPROPERTY(EditAnywhere)
 	UMaterialInterface* NewMaterial;
 	
 	UPROPERTY(EditAnywhere)
 	int32 MaterialIndex = 0;
+};
+
+
+UCLASS()
+class REDUELEGACYGAME_API USeqAct_SetObject: public USequenceAction
+{
+	GENERATED_BODY()
+public:
+	
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 0))
+	void In();
+	
+	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
+	FSequenceActionDelegate Out;
+	
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
+	AActor* Value;
+
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Value);
+	
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1 ))
+	TArray<AActor*> Targets;
+
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Targets);
 };
 
 
@@ -45,7 +69,7 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Actors;
 
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Actors);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Actors);
 };
 
 
@@ -72,12 +96,12 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Actors;
 
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Actors);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Actors);
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1 ))
 	bool Bool;
 
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(bool,Bool);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Bool);
 	
 };
 
@@ -107,7 +131,7 @@ public:
 	UPROPERTY(EditAnywhere,BlueprintReadWrite,meta=(KismetExternalVariable ,LegacyIndex = 0))
 	float Duration = 1;
 
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(float,Duration);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Duration);
 private:
 	UPROPERTY()
 	float CurrentTime;
@@ -139,7 +163,7 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Actors;
 
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Actors);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Actors);
 };
 
 UCLASS()
@@ -165,7 +189,7 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Actors;
 
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Actors);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Actors);
 	
 	UPROPERTY(EditAnywhere)
 	USoundBase* PlaySound;
@@ -190,7 +214,7 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Actors;
 
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Actors);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Actors);
 };
 
 UCLASS()
@@ -227,7 +251,7 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Targets;
 
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Targets)
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Targets)
 	
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	float FadeOpacity;
@@ -260,12 +284,12 @@ public:
 
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0 ))
 	TArray<AActor*> Targets;
-	SEQUENCE_ACTION_KISMET_ARRAY_ATTRIBUTE(AActor*,Targets)
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Targets)
 
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1 ))
 	AActor* Destination;
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(AActor*,Destination)
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Destination)
 	
 };
 
@@ -291,23 +315,82 @@ struct FLegacyLevelStreamingNameCombo
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	FName LevelName;
+	
+	UPROPERTY(Transient)
+	ULevelStreaming* LevelStreaming;
 };
 UCLASS()
 class REDUELEGACYGAME_API UXSeqAct_MultiLevelStreaming: public USequenceAction
 {
 	GENERATED_BODY()
 public:
+	virtual void BeginPlay() override;
+	virtual void Construct() override;
+	
+	
 	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 0))
 	void Load();
 
 	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 1))
 	void Unload();
-	
+
 	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
 	FSequenceActionDelegate Finished;
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	TArray<FLegacyLevelStreamingNameCombo> Levels;
+	
+	
+};
+
+UCLASS()
+class REDUELEGACYGAME_API USeqAct_WaitForLevelsVisible: public USequenceAction
+{
+	GENERATED_BODY()
+public:
+	virtual void Tick(float DeltaTime) override;
+	
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 0))
+	void Wait();
+
+	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
+	FSequenceActionDelegate Finished;
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite)
+	TArray<FName> LevelNames;
+	
+	UPROPERTY(EditAnywhere,BlueprintReadWrite)
+	bool bShouldBlockOnLoad;
+	
+	UPROPERTY(Transient)
+	TArray<ULevelStreaming*> Levels;
+};
+
+
+
+UCLASS()
+class REDUELEGACYGAME_API USeqAct_GetDistance: public USequenceAction
+{
+	GENERATED_BODY()
+public:
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 0))
+	void In();
+	
+	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
+	FSequenceActionDelegate Out;
+	
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0))
+	AActor* A;
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(A);
+	
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1))
+	AActor* B;
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(B);
+	
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 2))
+	float Distance;
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Distance);
+	
 };
 
 

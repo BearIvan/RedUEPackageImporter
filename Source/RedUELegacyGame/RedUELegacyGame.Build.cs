@@ -34,6 +34,7 @@ public class RedUELegacyGame : ModuleRules
             PrivateDependencyModuleNames.AddRange(
                 new string[]
                 {
+                    "BlueprintGraph",
                     "UnrealEd",
                     "MovieSceneTools",
                 }

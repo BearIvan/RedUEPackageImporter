@@ -12,11 +12,23 @@ void ULegacyPrimitiveComponent::FillComponent_Implementation(UActorComponent* In
 
 	if (SceneComponent->GetAttachmentRootActor()->GetRootComponent() == InActorComponent)
 	{
-		return;
+		return ;
 	}
 	SceneComponent->SetRelativeLocation(FVector(Translation));
 	SceneComponent->SetRelativeRotation(FRotator(Rotation));
 	SceneComponent->SetRelativeScale3D(FVector(Scale3D));
+	SceneComponent->SetHiddenInGame(HiddenGame);
+	if (UPrimitiveComponent* PrimitiveComponent = Cast<UPrimitiveComponent>(SceneComponent))
+	{
+		if (!CollideActors)
+		{
+			PrimitiveComponent->SetCollisionEnabled(BlockActors ? ECollisionEnabled::PhysicsOnly : ECollisionEnabled::NoCollision);
+		}
+		else if (!BlockActors)
+		{
+			PrimitiveComponent->SetCollisionEnabled(CollideActors ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+		}
+	}
 }
 
 void ULegacyParticleSystemComponent::FillComponent_Implementation(UActorComponent* InActorComponent)

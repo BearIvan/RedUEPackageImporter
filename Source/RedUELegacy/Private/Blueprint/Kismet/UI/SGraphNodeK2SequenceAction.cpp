@@ -1,5 +1,6 @@
 ﻿#include "SGraphNodeK2SequenceAction.h"
 #include "GraphEditorSettings.h"
+#include "ScopedTransaction.h"
 #include "Blueprint/Kismet/K2Node_SequenceAction.h"
 
 #define LOCTEXT_NAMESPACE "RedUELegacy"
@@ -44,6 +45,7 @@ EVisibility SGraphNodeK2SequenceAction::IsAddPinButtonVisible() const
 
 FReply SGraphNodeK2SequenceAction::OnAddPin()
 {
+	const FScopedTransaction Transaction( NSLOCTEXT("RedUELegacy","AddSequenceActionEvent_Transaction","Add Event Input") );
 	SequenceNode->AddEventPin();
 
 	return FReply::Handled();

@@ -14,8 +14,13 @@ public:
 	
 protected:
 	virtual void	BeginPlay			() override;
+	virtual void	EndPlay				(const EEndPlayReason::Type EndPlayReason) override;
 private:
 			void	LevelAddedToWorld	(ULevel* Level, UWorld* World);
+
+	FDelegateHandle OnLevelAddedToWorld;
+protected:
+
 public:
 	UPROPERTY(EditAnywhere,Category="Legacy")
 	TArray<FName> LevelNames;
@@ -39,4 +44,6 @@ private:
 	TArray<ULevelStreaming*> Levels;
 	
 	
+	UPROPERTY(Transient)
+	FTransform InitialTransform;
 };

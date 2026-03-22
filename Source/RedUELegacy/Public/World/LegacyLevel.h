@@ -5,6 +5,7 @@
 #include "Core/LegacyObject.h"
 #include "LegacyLevel.generated.h"
 
+class ULegacyModel;
 class ULegacySequence;
 
 UCLASS()
@@ -22,11 +23,14 @@ public:
     TArray<ULegacyActor*> Actors;
 
     UPROPERTY()
-    UObject * Model;
+    ULegacyModel * Model;
     
     UPROPERTY()
     TArray<UObject*> ModelComponents;
     
     UPROPERTY()
     TArray<ULegacySequence*> GameSequences;
+    
+    UPROPERTY(Transient)
+    ULegacyWorldInfo* WorldInfo;
 };

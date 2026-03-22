@@ -11,6 +11,8 @@ class REDUELEGACY_API ULegacyStaticMeshComponent : public ULegacyPrimitiveCompon
 {
     GENERATED_BODY()
 public:
+    ULegacyStaticMeshComponent();
+    
     virtual void FillComponent_Implementation(UActorComponent* InActorComponent) override;
     
     UPROPERTY(BlueprintReadWrite)

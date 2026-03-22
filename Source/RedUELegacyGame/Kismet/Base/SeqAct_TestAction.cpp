@@ -26,3 +26,21 @@ void USeqAct_TestAction::Test2()
 {
 	OnTest2.Broadcast();
 }
+
+void USeqAct_TestAction2::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
+void USeqAct_TestAction2::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+}
+
+void USeqAct_TestAction2::Test1()
+{
+}
+
+void USeqAct_TestAction2::Test2()
+{
+}

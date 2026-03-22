@@ -95,7 +95,7 @@ void UXPatternCommand_Speak::Begin()
 	if (UXSeqAct_InstancePattern* InstancePattern = GetTypedOuter<UXSeqAct_InstancePattern>())
 	{
 		InstancePattern->LastPawn = Speaker->GetPawn();
-		if (InstancePattern->LastPawn)
+		if (InstancePattern->LastPawn && InstancePattern->LastPawn->GetClass()->ImplementsInterface(URedXPawnInterface::StaticClass()))
 		{
 			IRedXPawnInterface::Execute_Speak(InstancePattern->LastPawn,Audio);
 		}
@@ -134,7 +134,7 @@ bool UXPatternCommand_AudioTimeElapsed::CanJumpNextCommand()
 {
 	if (UXSeqAct_InstancePattern* InstancePattern = GetTypedOuter<UXSeqAct_InstancePattern>())
 	{
-		if (InstancePattern->LastPawn )
+		if (InstancePattern->LastPawn && InstancePattern->LastPawn->GetClass()->ImplementsInterface(URedXPawnInterface::StaticClass()))
 		{
 			if (IRedXPawnInterface::Execute_IsSpeaking(InstancePattern->LastPawn))
 			{

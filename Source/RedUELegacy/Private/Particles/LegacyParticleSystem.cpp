@@ -7,8 +7,12 @@
 #include "Particles/ParticleSpriteEmitter.h"
 #include "Particles/Spawn/ParticleModuleSpawn.h"
 
-void ULegacyParticleLODLevel::Export(UParticleSystem* ParticleSystem, const TObjectPtr<UParticleLODLevel>& LODLevel)
+void ULegacyParticleLODLevel::Export(UParticleSystem* ParticleSystem, const TObjectPtr<UParticleLODLevel>& LODLevel, int32 LOD)
 {
+	if (LOD>0)
+	{
+		return;
+	}
 	if (RequiredModule)
 	{
 		LODLevel->RequiredModule = CastChecked<UParticleModuleRequired>(RequiredModule->Export(ParticleSystem));
@@ -41,7 +45,7 @@ void ULegacyParticleSpriteEmitter::Export(UParticleSystem* NewParticleSystem)
 	for (ULegacyParticleLODLevel*LegacyParticleLOD:LODLevels)
 	{
 		int32 Index = NewParticleSpriteEmitter->CreateLODLevel(LodIndex++);
-		LegacyParticleLOD->Export(NewParticleSystem, NewParticleSpriteEmitter->LODLevels[Index]);
+		LegacyParticleLOD->Export(NewParticleSystem, NewParticleSpriteEmitter->LODLevels[Index],Index);
 	}
 
 	NewParticleSpriteEmitter->UpdateModuleLists();

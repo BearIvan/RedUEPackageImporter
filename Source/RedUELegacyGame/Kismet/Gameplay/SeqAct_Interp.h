@@ -51,22 +51,22 @@ public:
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0))
 	ALevelSequenceActor* Data;
 
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(ALevelSequenceActor*,Data);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Data);
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1))
 	float NewPosition;
 	
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(float,NewPosition);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(NewPosition);
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 2))
 	float CurrentPosition;
 	
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(float,CurrentPosition);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(CurrentPosition);
 
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 3))
 	float Duration;
 	
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(float,Duration)
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Duration)
 
 private:
 	

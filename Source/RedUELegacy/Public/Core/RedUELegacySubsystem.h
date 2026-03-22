@@ -27,6 +27,7 @@ public:
     void            Initialize				(ERedUELegacyEngineType CurrentEngineType, ERedUELegacyGameType CurrentGameType);
     ULegacyObject*  CreateObject            (FName ObjectName,FName ClassName, ULegacyPackage*FromPackage);
     bool            IsKnownClass            (FName ClassName);
+	UCurveFloat*	GetBrightnessToEVCurve	();
     int32           ObjectsBeginLoadCount = 0;
 
 	UFUNCTION(BlueprintCallable)
@@ -73,7 +74,10 @@ public:
 	
 	UPROPERTY(Transient)
 	TArray<USkeleton*> Skeletons;
-
+	
+	UPROPERTY(Transient)
+	UCurveFloat* BrightnessToEV;
+	
 	UPROPERTY(Transient)
 	ULegacyXWorldFloatingSectionIndexTable* FloatingSectionIndexTable = nullptr;
 	

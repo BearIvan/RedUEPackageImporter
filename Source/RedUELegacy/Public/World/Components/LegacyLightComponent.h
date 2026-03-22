@@ -23,10 +23,10 @@ public:
 	virtual void FillComponent_Implementation(UActorComponent* InActorComponent) override;
 	
 	UPROPERTY(BlueprintReadWrite)
-	float Brightness;
+	float Brightness = 1.f;
 	
 	UPROPERTY(BlueprintReadWrite)
-	FColor LightColor;
+	FColor LightColor = FColor::White;
 	
 	UPROPERTY(BlueprintReadWrite)
 	ULegacyLightFunction* Function;
@@ -44,7 +44,10 @@ public:
 	FVector3f Translation;
 
 	UPROPERTY(BlueprintReadWrite)
-	float Radius;
+	float Radius = 1024;
+	
+	UPROPERTY(BlueprintReadWrite)
+	float FalloffExponent = 2;
 
 	
 };

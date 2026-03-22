@@ -46,3 +46,20 @@ class REDUELEGACY_API ULegacyPointLightToggleable : public ULegacyPointLight
 	GENERATED_BODY()
 };
 
+
+UCLASS()
+class REDUELEGACY_API ULegacyStaticLightCollectionActor : public ULegacyActor
+{
+	GENERATED_BODY()
+
+public:
+	virtual void LegacySerialize(FRedUELegacyArchive& Ar) override;
+	virtual AActor* Spawn_Implementation() override;
+
+	UPROPERTY(BlueprintReadWrite)
+	TArray<	ULegacyLightComponent*> LightComponents;
+	
+	UPROPERTY(Transient)
+	TArray<FMatrix44f> Matrices;
+
+};

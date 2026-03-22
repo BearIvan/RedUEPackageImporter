@@ -28,6 +28,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category="Kismet|Bioshock")
 	APlayerController* PlayerController;
 private:
+	UPROPERTY(Transient)
+	TArray<FName> RemoteEventNames;
+	
 	UPROPERTY()
 	bool bFirstTick;
 };

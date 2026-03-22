@@ -25,14 +25,6 @@
 			]
 		},
 		{
-			"Name": "RedUEPackageImporter",
-			"Type": "Editor",
-			"LoadingPhase": "Default",
-			"PlatformAllowList": [
-				"Win64"
-			]
-		},
-		{
 			"Name": "RedUELegacyGame",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"

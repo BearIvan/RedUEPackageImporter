@@ -92,7 +92,7 @@ class REDUELEGACY_API ULegacyParticleModule : public ULegacyObject
 	GENERATED_BODY()
 public:
 	virtual UParticleModule* Export(UParticleSystem* ParticleSystem);
-
+	
 	UPROPERTY(BlueprintReadWrite)
 	uint8 LODValidity;
 

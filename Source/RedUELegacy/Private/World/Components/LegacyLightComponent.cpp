@@ -1,5 +1,6 @@
 ﻿#include "World/Components/LegacyLightComponent.h"
 
+#include "Core/RedUELegacySubsystem.h"
 #include "Material/LegacyMaterialInterface.h"
 
 void ULegacyLightComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
@@ -12,7 +13,15 @@ void ULegacyLightComponent::FillComponent_Implementation(UActorComponent* InActo
 		LocalLightComponent->IntensityUnits = ELightUnits::EV;
 	}
 	LightComponent->SetMobility( EComponentMobility::Movable);
+	
 	LightComponent->SetIntensity(FMath::Min(Brightness,20.f));
+	{
+		URedUELegacySubsystem*RedUELegacySubsystem =  GetTypedOuter<URedUELegacySubsystem>();
+		if (UCurveFloat* Curve = RedUELegacySubsystem->GetBrightnessToEVCurve())
+		{
+			LightComponent->SetIntensity(Curve->GetFloatValue(Brightness));
+		}
+	}
 	if (Function)
 	{
 		if (Function->SourceMaterial)
@@ -40,6 +49,8 @@ void ULegacyPointLightComponent::FillComponent_Implementation(UActorComponent* I
 		PointLightComponent->SetRelativeLocation(FVector(Translation));
 	}
 	PointLightComponent->SetAttenuationRadius(Radius*2.f);
+	PointLightComponent->SetUseInverseSquaredFalloff(false);
+	PointLightComponent->SetLightFalloffExponent(FalloffExponent);
 
 }
 

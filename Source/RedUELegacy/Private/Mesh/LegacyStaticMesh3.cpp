@@ -7,6 +7,8 @@
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacyGame.h"
 #include "Material/LegacyMaterialInterface.h"
+#include "Mesh/LegacyBodySetup.h"
+#include "PhysicsEngine/BodySetup.h"
 
 
 ULegacyStaticMesh3::ULegacyStaticMesh3()
@@ -260,7 +262,16 @@ UObject* ULegacyStaticMesh3::ExportToContent()
             SourceModel.BuildSettings.DstLightmapIndex = 1;
             SourceModel.BuildSettings.MinLightmapResolution = 128;
         }
+    	StaticMesh->CreateBodySetup();
+    	if (ULegacyRB_BodySetup* InBodySetup = Cast<ULegacyRB_BodySetup>(BodySetup))
+    	{
+    		InBodySetup->PushTo(StaticMesh->GetBodySetup());
+    	}
         StaticMesh->SetStaticMaterials(Materials);
+    	if (!UseSimpleLineCollision || !UseSimpleBoxCollision || !UseSimpleRigidBodyCollision)
+    	{
+    		StaticMesh->GetBodySetup()->CollisionTraceFlag = CTF_UseComplexAsSimple;
+    	}
         StaticMesh->Build();
         StaticMesh->PostEditChange();
         StaticMesh->Modify();

@@ -130,6 +130,7 @@ void URedUELegacySubsystem::Initialize(ERedUELegacyEngineType InCurrentEngineTyp
     RefreshClasses(InCurrentEngineType,InCurrentGameType);
     if(CurrentEngineType==ERedUELegacyEngineType::UnrealEngine3)
     {
+        GetPackage(TEXT("Engine"));
         GetPackage(TEXT("Startup_INT"));
     }
     if(CurrentGameType == ERedUELegacyGameType::Singularity)
@@ -138,6 +139,7 @@ void URedUELegacySubsystem::Initialize(ERedUELegacyEngineType InCurrentEngineTyp
     }
     if(CurrentGameType == ERedUELegacyGameType::Bioshock3)
     {
+        GetPackage(TEXT("XCore"));
         GetPackage(TEXT("Master_P"));
         GetPackage(TEXT("XEntry_p"));
         GetPackage(TEXT("DLCB_Master_P"));
@@ -170,6 +172,15 @@ bool URedUELegacySubsystem::IsKnownClass(FName ClassName)
 {
     const TSubclassOf<ULegacyObject>* Class = Classes.Find(ClassName);
     return Class != nullptr || SequenceActionClasses.Contains(ClassName);
+}
+
+UCurveFloat* URedUELegacySubsystem::GetBrightnessToEVCurve()
+{
+    if (!BrightnessToEV)
+    {
+        BrightnessToEV = LoadObject<UCurveFloat>(nullptr, TEXT("/RedUEPackageImporter/CF_BrightnessToEV.CF_BrightnessToEV"));
+    }
+    return BrightnessToEV;
 }
 
 void URedUELegacySubsystem::ImportWorld(FName PackageName, TSet<FName> AllowLevels, TSet<FName> DenyLevels, bool AllowAlwaysLoadingLevel,bool ImportPersistentLevel, bool ReimportKismet)

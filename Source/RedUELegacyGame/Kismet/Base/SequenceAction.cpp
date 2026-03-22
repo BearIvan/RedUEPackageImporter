@@ -20,6 +20,14 @@ void USequenceAction::Construct()
 				}
 			}
 		}
+		CustomLinks.AddDefaulted(InitializeCustomLinks.Num());
+		for (auto&[Key,Value]:InitializeCustomLinks)
+		{
+			if (UFunction* NewFunction = LegacyKismet->GetClass()->FindFunctionByName(Value))
+			{
+				CustomLinks[Key] = NewFunction;
+			}
+		}
 	}
 }
 
@@ -69,6 +77,17 @@ void USequenceAction::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 			}
 		}
 	}
+	else if (FIntProperty* LinkProperty = CastField<FIntProperty>(PropertyChangedEvent.Property) ; LinkProperty && LinkProperty->HasMetaData(TEXT("KismetLinkCount")))
+	{
+		if (UK2Node* Node = GetTypedOuter<UK2Node>())
+		{
+			Node->ReconstructNode();
+		}
+		if (UBlueprint* Blueprint = GetTypedOuter<UBlueprint>())
+		{
+			FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+		}
+	}
 	else
 	{
 		if (FSequenceActionPropertyArrayReference* PropertyReference = PropertiesArrayReference.Find(ArrayProperty->GetFName()))
@@ -80,6 +99,20 @@ void USequenceAction::PostEditChangeProperty(FPropertyChangedEvent& PropertyChan
 	
 }
 #endif
+
+
+void USequenceAction::ExecuteCustomLink(int32 Index)
+{
+	if (CustomLinks.Num() > Index && Index >= 0 && CustomLinks[Index])
+	{
+		if (ALegacyKismet* Owner = GetOwnerKismetChecked())
+		{
+			Owner->ProcessEvent(CustomLinks[Index], nullptr);
+		}
+	}
+}
+
+
 ALegacyKismet* USequenceAction::GetOwnerKismetChecked()
 {
 	ALegacyKismet* Kismet = GetTypedOuter<ALegacyKismet>();

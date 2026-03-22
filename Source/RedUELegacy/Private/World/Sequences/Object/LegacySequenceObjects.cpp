@@ -54,15 +54,14 @@
 #include "World/Sequences/LegacySequence.h"
 
 
-UK2Node_SequenceAction* ULegacySequenceOp::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
+UK2Node* ULegacySequenceObject::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	return nullptr;
 }
 
 UEdGraphPin* ULegacySequenceOp::GetInputPin(int32 Index, UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
-	UK2Node_SequenceAction* Action = ExportToBlueprint(InBlueprint, InGraph);
-	if (Action)
+	if (UK2Node_SequenceAction* Action = Cast<UK2Node_SequenceAction>( ExportToBlueprint(InBlueprint, InGraph)))
 	{
 		FName *InputName = Action->LegacyIndexToInputPin.Find(Index);
 		if (ensure(InputName))
@@ -76,7 +75,7 @@ UEdGraphPin* ULegacySequenceOp::GetInputPin(int32 Index, UBlueprint* InBlueprint
 
 UEdGraphPin* ULegacySequenceOp::GetEventPin(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
-	if (UK2Node_SequenceAction* Action = ExportToBlueprint(InBlueprint, InGraph))
+	if (UK2Node_SequenceAction* Action = Cast<UK2Node_SequenceAction>( ExportToBlueprint(InBlueprint, InGraph)))
 	{
 		return Action->GetEventOutput();
 	}
@@ -89,7 +88,7 @@ void ULegacySequenceOp::SimulatedImport()
 }
 
 
-void ULegacySequenceImporter::FillPin(UBlueprint* InBlueprint, UEdGraph* InGraph, const FLegacySeqOpOutputLink& LegacySeqOpOutputLink, UEdGraphPin* OutputPin)
+void ULegacySequenceOp::FillPin(UBlueprint* InBlueprint, UEdGraph* InGraph, const FLegacySeqOpOutputLink& LegacySeqOpOutputLink, UEdGraphPin* OutputPin)
 {
 	TArray<UEdGraphPin*> Pins;
 	for (const FLegacySeqOpOutputInputLink& Link : LegacySeqOpOutputLink.Links)
@@ -138,9 +137,10 @@ void ULegacySequenceImporter::FillPin(UBlueprint* InBlueprint, UEdGraph* InGraph
 
 void ULegacySequenceImporter::FillAction(USequenceAction* InSequenceAction)
 {
+	
 }
 
-UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
+UK2Node* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	if (CurrentNode)
 	{
@@ -153,7 +153,7 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 	NewNode->Action = NewObject<USequenceAction>(NewNode,ToAction->GetClass(),NAME_None,RF_Transactional,ToAction);
 	FillAction(NewNode->Action);
 	NewNode->bCommentBubblePinned = true;
-	NewNode->OnUpdateCommentText(GetLegacyFullName());
+	NewNode->NodeComment = GetLegacyFullName();
 	
 	NodeCreator.Finalize();
 	CurrentNode = NewNode;
@@ -193,13 +193,39 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 
 			FillPin(InBlueprint, InGraph, LegacySeqOpOutputLink, OutputPin);
 		}
-		
 	}
+	
+
 	for (int32  i = 0;i<VariableLinks.Num();i++)
 	{
 		if (FName*VariableName = NewNode->LegacyIndexToVariableName.Find(i))
 		{
-			if (VariableLinks[i].LinkedVariables.Num() > 0)
+			TArray< ULegacySequenceVariable*> LegacySequenceVariables;
+			
+			TFunction<void(ULegacySequenceVariable*)> LambdaBuildVariableLinks = [&LegacySequenceVariables,&LambdaBuildVariableLinks](ULegacySequenceVariable* InLinkVariable)
+			{
+				if (ULegacySeqVar_External* SeqVar_External = Cast<ULegacySeqVar_External>(InLinkVariable))
+				{
+					for (ULegacySequenceVariable* InLinkVariableFromExternal :SeqVar_External->Variables)
+					{
+						LambdaBuildVariableLinks(InLinkVariableFromExternal);
+					}
+				}
+				else if (ULegacySeqVar_Named* SeqVar_Named = Cast<ULegacySeqVar_Named>(InLinkVariable))
+				{
+					LambdaBuildVariableLinks(SeqVar_Named->FindVariable());
+				}
+				else
+				{
+					LegacySequenceVariables.Add(InLinkVariable);
+				}
+			};
+			for (ULegacySequenceVariable* InLinkVariable: VariableLinks[i].LinkedVariables)
+			{
+				LambdaBuildVariableLinks(InLinkVariable);
+			}
+			
+			if (LegacySequenceVariables.Num() > 0)
 			{
 				FProperty* DstProperty = NewNode->Action->GetClass()->FindPropertyByName(*VariableName);
 				if (!ensure(DstProperty))
@@ -207,18 +233,18 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 					continue;
 				}
 				
-				for (int32  LinkID = 0;LinkID<VariableLinks[i].LinkedVariables.Num();LinkID++)
+				for (int32  LinkID = 0;LinkID<LegacySequenceVariables.Num();LinkID++)
 				{
 					if (FArrayProperty* DstArrayProperty = CastField<FArrayProperty>(DstProperty))
 					{
-						if (ULegacySequenceVariable* Variable = CastChecked<ULegacySequenceVariable>(VariableLinks[i].LinkedVariables[LinkID],ECastCheckedType::NullAllowed))
+						if (ULegacySequenceVariable* Variable = CastChecked<ULegacySequenceVariable>(LegacySequenceVariables[LinkID],ECastCheckedType::NullAllowed))
 						{
 							if (FName VariableDescription = Variable->GetOrCreateVariable(InBlueprint,InGraph);VariableDescription != NAME_None)
 							{
 								FProperty* BlueprintProperty = InBlueprint->SkeletonGeneratedClass->FindPropertyByName(VariableDescription);
 								if (ensure(BlueprintProperty))
 								{
-									if (VariableLinks[i].LinkedVariables.Num() == 0 && PropertyAccessUtil::ArePropertiesCompatible(BlueprintProperty,DstProperty) )
+									if (LegacySequenceVariables.Num() == 0 && PropertyAccessUtil::ArePropertiesCompatible(BlueprintProperty,DstProperty) )
 									{
 										FMemberReference&Reference = NewNode->Action->PropertiesReference.Add(*VariableName);
 										Reference.SetExternalMember(VariableDescription,InBlueprint->SkeletonGeneratedClass);
@@ -240,7 +266,7 @@ UK2Node_SequenceAction* ULegacySequenceImporter::ExportToBlueprint(UBlueprint* I
 					else
 					{
 						ensure(VariableLinks[i].LinkedVariables.Num() == 1);
-						if (ULegacySequenceVariable* Variable = CastChecked<ULegacySequenceVariable>(VariableLinks[i].LinkedVariables[0],ECastCheckedType::NullAllowed))
+						if (ULegacySequenceVariable* Variable = CastChecked<ULegacySequenceVariable>(LegacySequenceVariables[0],ECastCheckedType::NullAllowed))
 						{
 							if (FName VariableDescription = Variable->GetOrCreateVariable(InBlueprint,InGraph);VariableDescription != NAME_None)
 							{
@@ -279,6 +305,54 @@ void ULegacySequenceImporter::PreLegacySerializeUnrealProps(FRedUELegacyArchive&
 }
 
 
+UEdGraphPin* ULegacySeqAct_FinishSequence::GetInputPin(int32 Index, UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	if (Index == 0 && CurrentTunnelNode)
+	{
+		if (UEdGraphPin* OutputPin = CurrentTunnelNode->FindPinChecked(InputPinName))
+		{
+			return OutputPin;
+		}
+	}
+	return nullptr;
+}
+
+UEdGraphPin* ULegacySeqAct_FinishSequence::GetEventPin(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	ensure(!"not_implemented");
+	return nullptr;
+}
+
+UK2Node* ULegacySeqAct_FinishSequence::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	return nullptr;
+}
+
+UEdGraphPin* ULegacySeqEvent_SequenceActivated::GetInputPin(int32 Index, UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	ensure(!"not_implemented");
+	return nullptr;
+}
+
+UEdGraphPin* ULegacySeqEvent_SequenceActivated::GetEventPin(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	ensure(!"not_implemented");
+	return nullptr;
+}
+
+UK2Node* ULegacySeqEvent_SequenceActivated::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	if (OutputPinName != NAME_None && CurrentTunnelNode && OutputLinks.Num() == 1)
+	{
+		if (UEdGraphPin* OutputPin = CurrentTunnelNode->FindPinChecked(OutputPinName))
+		{
+			const FLegacySeqOpOutputLink& LegacySeqOpOutputLink = OutputLinks[0];
+			FillPin(InBlueprint, InGraph, LegacySeqOpOutputLink, OutputPin);
+		}
+	}
+	return nullptr;
+}
+
 FName ULegacySequenceVariable::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	return NAME_None;
@@ -298,7 +372,7 @@ FName ULegacySeqVar_Object::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGrap
 			VarName = GetLegacyFName();
 		}
 		{
-			ensure(ObjValue&&ObjValue->IsA<ULegacyActor>());
+			ensure(!ObjValue||ObjValue->IsA<ULegacyActor>());
 			FEdGraphPinType ObjectPinType(UEdGraphSchema_K2::PC_Object, NAME_None, AActor::StaticClass(), EPinContainerType::None, false, FEdGraphTerminalType());
 			if(ensure(FBlueprintEditorUtils::AddMemberVariable(InBlueprint, VarName, ObjectPinType)))
 			{
@@ -324,21 +398,20 @@ FName ULegacySeqVar_Object::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGrap
 
 void ULegacySeqVar_Object::Fill(ALegacyKismet* Kismet)
 {
-	if(VarName == NAME_None)
-	{
-		VarName = GetLegacyFName();
-	}
-	FProperty* InProperty = Kismet->GetClass()->FindPropertyByName(VarName);
-	if (!InProperty)
+	if (VarName == NAME_None || !VarGuid.IsValid())
 	{
 		return;
 	}
-	FObjectProperty* InPropertyProperty = CastField<FObjectProperty>(InProperty);
-	if (ensure(InPropertyProperty))
+	FProperty* InProperty = Kismet->GetClass()->FindPropertyByName(VarName);
+	if (ensure(InProperty))
 	{
-		if (ObjValue&&ObjValue->PresentObject)
+		FObjectProperty* InPropertyProperty = CastField<FObjectProperty>(InProperty);
+		if (ensure(InPropertyProperty))
 		{
-			InPropertyProperty->SetPropertyValue_InContainer(Kismet, ObjValue->PresentObject);
+			if (ObjValue&&ObjValue->PresentObject)
+			{
+				InPropertyProperty->SetPropertyValue_InContainer(Kismet, ObjValue->PresentObject);
+			}
 		}
 	}
 }
@@ -417,22 +490,49 @@ void ULegacySeqVar_Int::Fill(ALegacyKismet* Kismet)
 	Super::Fill(Kismet);
 }
 
+
+
+FName ULegacySeqVar_Float::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	if(!VarGuid.IsValid())
+	{
+		if(VarName == NAME_None)
+		{
+			VarName = GetLegacyFName();
+		}
+		{
+			FEdGraphPinType ObjectPinType(UEdGraphSchema_K2::PC_Real, UEdGraphSchema_K2::PC_Double,nullptr, EPinContainerType::None, false, FEdGraphTerminalType());
+			if(ensure(FBlueprintEditorUtils::AddMemberVariable(InBlueprint, VarName, ObjectPinType,FString::Printf(TEXT("%f"),FloatValue))))
+			{
+				if(ensure(InBlueprint->NewVariables.Last().VarName == VarName))
+				{
+					InBlueprint->NewVariables.Last().PropertyFlags &= ~CPF_DisableEditOnInstance;
+					VarGuid = InBlueprint->NewVariables.Last().VarGuid;
+				}
+			}
+		}
+		if(!VarGuid.IsValid())
+		{
+			return NAME_None;
+		}
+	}
+	FBPVariableDescription* PointerPtr = InBlueprint->NewVariables.FindByPredicate([this](const FBPVariableDescription& Item) { return Item.VarGuid == VarGuid; });
+	if(!PointerPtr)
+	{
+		return NAME_None;
+	}
+	return PointerPtr->VarName;
+}
+
+
 FName ULegacySeqVar_Named::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
-	if (ULegacySequenceVariable* Variable = FindVariable())
-	{
-		return Variable->GetOrCreateVariable(InBlueprint, InGraph);
-	}
-	return Super::GetOrCreateVariable(InBlueprint, InGraph);
+	checkNoEntry();
+	return NAME_None;
 }
 
 void ULegacySeqVar_Named::Fill(ALegacyKismet* Kismet)
 {
-	if (ULegacySequenceVariable* Variable = FindVariable())
-	{
-		return Variable->Fill(Kismet);
-	}
-	Super::Fill(Kismet);
 }
 
 ULegacySequenceVariable* ULegacySeqVar_Named::FindVariable()
@@ -442,7 +542,7 @@ ULegacySequenceVariable* ULegacySeqVar_Named::FindVariable()
 		return RefVariable;
 	}
 	URedUELegacySubsystem*RedUELegacySubsystem =  GEditor->GetEditorSubsystem<URedUELegacySubsystem>();
-	if (RedUELegacySubsystem->GLegacyWorld&&RedUELegacySubsystem->GLegacyWorld->PersistentLevel)
+	if (RedUELegacySubsystem->GLegacyWorld && RedUELegacySubsystem->GLegacyWorld->PersistentLevel)
 	{
 		for (ULegacySequence* Sequence: RedUELegacySubsystem->GLegacyWorld->PersistentLevel->GameSequences)
 		{
@@ -493,7 +593,7 @@ FName ULegacySeqVar_ObjectList::GetOrCreateVariable(UBlueprint* InBlueprint, UEd
 
 void ULegacySeqVar_ObjectList::Fill(ALegacyKismet* Kismet)
 {
-	if (VarName == NAME_None)
+	if (VarName == NAME_None || !VarGuid.IsValid())
 	{
 		return;
 	}
@@ -519,6 +619,16 @@ void ULegacySeqVar_ObjectList::Fill(ALegacyKismet* Kismet)
 	}
 }
 
+FName ULegacySeqVar_External::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
+{
+	checkNoEntry();
+	return NAME_None;
+}
+
+void ULegacySeqVar_External::Fill(ALegacyKismet* Kismet)
+{
+}
+
 FName ULegacyXSeqVar_PlayerController::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	return GET_MEMBER_NAME_CHECKED(ALegacyKismet,PlayerController);
@@ -534,7 +644,7 @@ ULegacySeqAct_Interp::ULegacySeqAct_Interp()
 	ToAction = CreateDefaultSubobject<USeqAct_Interp>("USeqAct_Interp");
 }
 
-UK2Node_SequenceAction* ULegacySeqAct_Interp::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
+UK2Node* ULegacySeqAct_Interp::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	bool NeedCreateEvent = false;
 	if (!CurrentNode)
@@ -564,7 +674,7 @@ UK2Node_SequenceAction* ULegacySeqAct_Interp::ExportToBlueprint(UBlueprint* InBl
 		
 		NeedCreateEvent = true;
 	}
-	UK2Node_SequenceAction*  Result = Super::ExportToBlueprint(InBlueprint, InGraph);
+	UK2Node_SequenceAction*  Result =  CastChecked<UK2Node_SequenceAction>(Super::ExportToBlueprint(InBlueprint, InGraph),ECastCheckedType::NullAllowed);
 	if (NeedCreateEvent)
 	{
 		
@@ -586,7 +696,8 @@ UK2Node_SequenceAction* ULegacySeqAct_Interp::ExportToBlueprint(UBlueprint* InBl
 			NewEventNode->AllocateDefaultPins();
 			NewEventNode->bCommentBubblePinned = true;
 			NewEventNode->NodePosY = 0;
-			NewEventNode->OnUpdateCommentText(GetLegacyFullName());
+			NewEventNode->NodeComment = GetLegacyFullName();
+			//NewEventNode->OnUpdateCommentText(GetLegacyFullName());
 			UEdGraphSchema_K2::SetNodeMetaData(NewEventNode, FNodeMetadata::DefaultGraphNode);
 			InGraph->AddNode(NewEventNode);
 			FillPin(InBlueprint,InGraph,OutputLinks[i],NewEventNode ->GetThenPin());			
@@ -723,7 +834,7 @@ ULegacyXSeqAct_InstancePattern::ULegacyXSeqAct_InstancePattern()
 	ToAction = CreateDefaultSubobject<UXSeqAct_InstancePattern>("XSeqAct_InstancePattern");
 }
 
-UK2Node_SequenceAction* ULegacyXSeqAct_InstancePattern::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
+UK2Node* ULegacyXSeqAct_InstancePattern::ExportToBlueprint(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	bool NeedCreateEvent = false;
 	if (!CurrentNode)
@@ -741,7 +852,7 @@ UK2Node_SequenceAction* ULegacyXSeqAct_InstancePattern::ExportToBlueprint(UBluep
 		}
 		NeedCreateEvent = true;
 	}	
-	UK2Node_SequenceAction*  Result = Super::ExportToBlueprint(InBlueprint, InGraph);
+	UK2Node_SequenceAction*  Result = CastChecked<UK2Node_SequenceAction>(Super::ExportToBlueprint(InBlueprint, InGraph),ECastCheckedType::NullAllowed);
 	if (NeedCreateEvent)
 	{
 		for (int32  i = 4;i<OutputLinks.Num();i++)
@@ -761,7 +872,8 @@ UK2Node_SequenceAction* ULegacyXSeqAct_InstancePattern::ExportToBlueprint(UBluep
 			NewEventNode->AllocateDefaultPins();
 			NewEventNode->bCommentBubblePinned = true;
 			NewEventNode->NodePosY = 0;
-			NewEventNode->OnUpdateCommentText(GetLegacyFullName());
+			NewEventNode->NodeComment = GetLegacyFullName();
+			//NewEventNode->OnUpdateCommentText(GetLegacyFullName());
 			UEdGraphSchema_K2::SetNodeMetaData(NewEventNode, FNodeMetadata::DefaultGraphNode);
 			InGraph->AddNode(NewEventNode);
 			FillPin(InBlueprint,InGraph,OutputLinks[i],NewEventNode ->GetThenPin());
@@ -915,7 +1027,7 @@ void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>
 
 void ULegacyInterpTrackToggle::ExportToLevelSequence(const TSharedRef<ISequencer>& Sequencer, ULegacyActor* LegacyAction)
 {
-	if (!ensure(LegacyAction))
+	if (!LegacyAction)
 	{
 		return;
 	}

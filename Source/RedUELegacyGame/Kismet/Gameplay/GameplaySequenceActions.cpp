@@ -3,14 +3,28 @@
 void UXSeqAct_PlayScriptedSequence::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	
 	if (CurrentTime > 0.f)
 	{
 		CurrentTime -= DeltaTime;
 		if (CurrentTime < 0.f)
 		{
-			if (!CleanupAfterBeingReady)
+			StartPosition = GetStartPosition();
+			if (StartPosition)
 			{
-				SequenceCleanedUp.Broadcast();
+				TArray<AActor*> InPlayers = GetTargets();
+				for (AActor* InPlayer:InPlayers)
+				{
+					APawn*Pawn = Cast<APawn>(InPlayer);
+					if (APlayerController* PlayerController = Cast<APlayerController>(InPlayer))
+					{
+						Pawn = PlayerController->GetPawn();
+					}
+					if (Pawn)
+					{
+						Pawn->TeleportTo(StartPosition->GetActorLocation(),StartPosition->GetActorRotation());
+					}
+				}
 			}
 		}
 	}
@@ -18,26 +32,24 @@ void UXSeqAct_PlayScriptedSequence::Tick(float DeltaTime)
 
 void UXSeqAct_PlayScriptedSequence::Initiate()
 {
-	if (CurrentTime > 0.f)
-	{
-		return;
-	}
+	// if (CurrentTime > 0.f)
+	// {
+	// 	return;
+	// }
+	
 	SequenceReady.Broadcast();
 	if (CleanupAfterBeingReady)
 	{
-		SequenceCleanedUp.Broadcast();
+	 	SequenceCleanedUp.Broadcast();
 	}
-	CurrentTime = MovePlayerDuration;
+	 CurrentTime = MovePlayerDuration;
 
 }
 
 void UXSeqAct_PlayScriptedSequence::Cleanup()
 {
-	if (CurrentTime <= 0.f)
-	{
-		return;
-	}
-	CurrentTime = 0.f;
+	
+
 	SequenceCleanedUp.Broadcast();
 }
 

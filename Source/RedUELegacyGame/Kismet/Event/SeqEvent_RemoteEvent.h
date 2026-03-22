@@ -13,6 +13,9 @@ public:
 
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	FName EventName;
+	
+	UPROPERTY(Transient)
+	USeqEvent_RemoteEvent* NextEvent;
 };
 
 UCLASS()

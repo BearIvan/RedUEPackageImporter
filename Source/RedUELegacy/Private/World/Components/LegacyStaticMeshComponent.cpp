@@ -1,5 +1,11 @@
 ﻿#include "World/Components/LegacyStaticMeshComponent.h"
 
+ULegacyStaticMeshComponent::ULegacyStaticMeshComponent()
+{
+	CollideActors = true;
+	BlockActors = true;
+}
+
 void ULegacyStaticMeshComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
 {
 	Super::FillComponent_Implementation(InActorComponent);
@@ -19,4 +25,6 @@ void ULegacyStaticMeshComponent::FillComponent_Implementation(UActorComponent* I
 			}
 		}
 	}
+	InStaticMeshComponent->SetCastHiddenShadow(bCastHiddenShadow);
+	
 }

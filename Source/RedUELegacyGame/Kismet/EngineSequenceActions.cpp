@@ -1,5 +1,6 @@
 ﻿#include "EngineSequenceActions.h"
 
+#include "Blueprints/RedUEBlueprintFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 
 void USeqAct_SetMaterial::In()
@@ -14,6 +15,12 @@ void USeqAct_SetMaterial::In()
 			PrimitiveComponent->SetMaterial(MaterialIndex,NewMaterial);
 		}
 	}
+	Out.Broadcast();
+}
+
+void USeqAct_SetObject::In()
+{
+	SetTargets(GetValue());
 	Out.Broadcast();
 }
 
@@ -229,11 +236,101 @@ void USeqEvent_Console::In()
 	Out.Broadcast();
 }
 
+void UXSeqAct_MultiLevelStreaming::BeginPlay()
+{
+	Super::BeginPlay();
+}
+
+void UXSeqAct_MultiLevelStreaming::Construct()
+{
+	Super::Construct();
+	for (FLegacyLevelStreamingNameCombo&Level:Levels)
+	{
+		Level.LevelStreaming = FStreamLevelAction::FindAndCacheLevelStreamingObject(Level.LevelName,GetWorld());
+	}
+}
+
 void UXSeqAct_MultiLevelStreaming::Load()
 {
+	for (FLegacyLevelStreamingNameCombo&Level:Levels)
+	{
+		if (ULevelStreaming* LevelStreaming = Level.LevelStreaming)
+		{
+			LevelStreaming->SetShouldBeLoaded(true);
+			LevelStreaming->SetShouldBeVisible(true);
+		}
+	}
 }
 
 void UXSeqAct_MultiLevelStreaming::Unload()
 {
+	for (FLegacyLevelStreamingNameCombo&Level:Levels)
+	{
+		if (ULevelStreaming* LevelStreaming = Level.LevelStreaming)
+		{
+			LevelStreaming->SetShouldBeLoaded(false);
+		}
+	}
+}
+
+void USeqAct_WaitForLevelsVisible::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
 	
+	if (!Levels.IsEmpty())
+	{
+		for (ULevelStreaming* LevelStreaming : Levels)
+		{
+			if (LevelStreaming->IsLevelVisible())
+			{
+				Levels.Remove(LevelStreaming);
+			}
+		}
+	
+		if (Levels.IsEmpty())
+		{
+			Finished.Broadcast();
+		}
+	}
+	
+}
+
+void USeqAct_WaitForLevelsVisible::Wait()
+{
+	Levels.Empty();
+	
+	class UWorld* InWorld = GetWorld();
+	for (FName LevelName:LevelNames)
+	{
+		if (ULevelStreaming* LocalLevel = FStreamLevelAction::FindAndCacheLevelStreamingObject( LevelName, InWorld ))
+		{
+			Levels.Add(LocalLevel);
+			LocalLevel->bShouldBlockOnLoad = bShouldBlockOnLoad;
+		}
+	}
+	if (Levels.IsEmpty())
+	{
+		Finished.Broadcast();
+	}
+}
+
+void USeqAct_GetDistance::In()
+{
+	float InDistance = UE_MAX_FLT;
+	AActor* InA = GetA();
+	AActor* InB = GetB();
+	if (AController* AAsController = Cast<AController>(InA))
+	{
+		InA = AAsController->GetPawn();
+	}
+	if (AController* BAsController = Cast<AController>(InB))
+	{
+		InB = BAsController->GetPawn();
+	}
+	if (InA && InB)
+	{
+		InDistance = FVector::Dist(InA->GetActorLocation(),InB->GetActorLocation());
+	}
+	SetDistance(InDistance);
+	Out.Broadcast();
 }

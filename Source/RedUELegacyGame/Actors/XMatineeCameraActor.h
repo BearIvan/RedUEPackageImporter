@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "XMatineeCameraActor.generated.h"
 
+class UCameraComponent;
 UCLASS()
 class REDUELEGACYGAME_API AXMatineeCameraActor : public AActor
 {

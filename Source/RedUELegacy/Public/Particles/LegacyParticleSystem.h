@@ -3,13 +3,15 @@
 #include "Core/LegacyObject.h"
 #include "LegacyParticleSystem.generated.h"
 
+class ULegacyParticleModuleRequired;
+class ULegacyParticleModule;
 
 UCLASS()
 class REDUELEGACY_API ULegacyParticleLODLevel : public ULegacyObject
 {
 	GENERATED_BODY()
 public:
-	void Export(UParticleSystem* ParticleSystem, const TObjectPtr<UParticleLODLevel>& ParticleLODLevel);
+	void Export(UParticleSystem* ParticleSystem, const TObjectPtr<UParticleLODLevel>& ParticleLODLevel, int32 LOD);
 
 	UPROPERTY(BlueprintReadWrite)
 	ULegacyParticleModuleRequired* RequiredModule = nullptr;

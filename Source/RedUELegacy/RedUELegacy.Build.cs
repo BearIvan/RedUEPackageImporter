@@ -54,7 +54,7 @@ public class RedUELegacy : ModuleRules
 				"UEOgg",
 				"Vorbis",
 				"VorbisFile",
-				"AudioEditor"
+				"AudioEditor", "BSPUtils"
 			}
 		);
 	}

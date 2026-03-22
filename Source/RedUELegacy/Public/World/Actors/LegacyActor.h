@@ -70,14 +70,6 @@ public:
 };
 
 UCLASS()
-class REDUELEGACY_API ULegacyXProxyCameraHeightActor : public ULegacyMarker
-{
-	GENERATED_BODY()
-public:
-	
-};
-
-UCLASS()
 class REDUELEGACY_API ULegacyXMatineeCameraActor : public ULegacyCameraActor
 {
 	GENERATED_BODY()
@@ -98,6 +90,19 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	FName PackageName;
 };
+
+UCLASS()
+class REDUELEGACY_API UXLevelStreamingGroup: public ULegacyObject
+{
+	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintReadWrite)
+	FName GroupName;
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<ULegacyLevelStreaming*> StreamingLevels;
+};
+
 
 UCLASS()
 class REDUELEGACY_API ULegacyLevelStreamingAlwaysLoaded: public ULegacyLevelStreaming
@@ -127,6 +132,16 @@ public:
 	
 };
 
+UCLASS()
+class REDUELEGACY_API ULegacyPlayerStart : public ULegacyActor
+{
+	GENERATED_BODY()
+public:
+	virtual UClass* GetActorClass_Implementation() override;
+	
+};
+
+
 
 USTRUCT(Blueprintable)
 struct FLegacyXWorldInfoStreamingLevelsWrapper
@@ -135,6 +150,10 @@ struct FLegacyXWorldInfoStreamingLevelsWrapper
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<ULegacyLevelStreaming*> StreamingLevels;
+	
+	UPROPERTY(BlueprintReadWrite)
+	TArray<UObject*> GroupedStreamingLevels;
+	
 };
 
 UCLASS()

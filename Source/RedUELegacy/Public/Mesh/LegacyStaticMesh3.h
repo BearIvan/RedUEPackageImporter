@@ -538,13 +538,13 @@ public:
     ULegacyObject* BodySetup = nullptr;
 
     UPROPERTY(BlueprintReadWrite)
-    bool UseSimpleLineCollision = false;
+    bool UseSimpleLineCollision = true;
     
     UPROPERTY(BlueprintReadWrite)
-    bool UseSimpleBoxCollision = false;
+    bool UseSimpleBoxCollision = true;
     
     UPROPERTY(BlueprintReadWrite)
-    bool UseSimpleRigidBodyCollision = false;
+    bool UseSimpleRigidBodyCollision = true;
     
     UPROPERTY(BlueprintReadWrite)
     bool UseFullPrecisionUVs = false;

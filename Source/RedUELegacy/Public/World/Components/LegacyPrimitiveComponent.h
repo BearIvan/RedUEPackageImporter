@@ -22,6 +22,18 @@ public:
     
 	UPROPERTY(BlueprintReadWrite)
 	FVector3f Translation;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool HiddenGame = false;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool bCastHiddenShadow = false;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool CollideActors = false;
+	
+	UPROPERTY(BlueprintReadWrite)
+	bool BlockActors = false;
 };
 
 /** Struct used for a particular named instance parameter for this ParticleSystemComponent. */
