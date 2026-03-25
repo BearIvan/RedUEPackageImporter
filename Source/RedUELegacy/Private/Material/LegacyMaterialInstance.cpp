@@ -301,6 +301,9 @@ void ULegacyMaterialInstance::ReadUniformExpressions(FArchive& Ar)
 	else if (Type == "FMaterialUniformExpressionTime")
 	{
 	}
+	else if (Type == "FMaterialUniformExpressionRealTime")
+	{
+	}
 	else if (Type == "FMaterialUniformExpressionTexture")
 	{
 		UObject* Object;

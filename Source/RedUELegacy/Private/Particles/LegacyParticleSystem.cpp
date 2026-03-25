@@ -45,7 +45,10 @@ void ULegacyParticleSpriteEmitter::Export(UParticleSystem* NewParticleSystem)
 	for (ULegacyParticleLODLevel*LegacyParticleLOD:LODLevels)
 	{
 		int32 Index = NewParticleSpriteEmitter->CreateLODLevel(LodIndex++);
-		LegacyParticleLOD->Export(NewParticleSystem, NewParticleSpriteEmitter->LODLevels[Index],Index);
+		if (LegacyParticleLOD)
+		{
+			LegacyParticleLOD->Export(NewParticleSystem, NewParticleSpriteEmitter->LODLevels[Index],Index);
+		}
 	}
 
 	NewParticleSpriteEmitter->UpdateModuleLists();

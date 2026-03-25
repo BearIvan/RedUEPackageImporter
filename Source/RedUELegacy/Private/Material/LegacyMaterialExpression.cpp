@@ -302,6 +302,7 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameter2D::CreateEx
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionTextureSampleParameter2D* Expression = CreateExpressionTyped<UMaterialExpressionTextureSampleParameter2D>(Material);
+		CurrentExpression = Expression;
 		SetExpressionInput(Expression->Coordinates, Coordinates, Material, Parameters);;
 		if (Texture)
 		{
@@ -313,7 +314,6 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameter2D::CreateEx
 		Expression->Group = Group;
 		Expression->PostEditChange();
 		Expression->Modify();
-		CurrentExpression = Expression;
 	}
 	return CurrentExpression;
 }
@@ -381,6 +381,7 @@ UMaterialExpression* ULegacyMaterialExpressionStaticSwitchParameter::CreateExpre
 	if (!CurrentExpression)
 	{
 		UMaterialExpressionStaticSwitchParameter* Expression = CreateExpressionTyped<UMaterialExpressionStaticSwitchParameter>(Material);
+		CurrentExpression = Expression;
 		Expression->Desc = GetLegacyFullName();
 		Expression->ParameterName = ParameterName;
 		Expression->Group = Group;
@@ -450,7 +451,6 @@ UMaterialExpression* ULegacyMaterialExpressionStaticSwitchParameter::CreateExpre
 		// }
 		Expression->PostEditChange();
 		Expression->Modify();
-		CurrentExpression = Expression;
 	}
 	return CurrentExpression;
 }

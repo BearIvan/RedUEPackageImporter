@@ -807,10 +807,14 @@ class UXPatternCommandBase* ULegacyXPatternEvent_TimeElapsed::MakeCommand(class 
 class UXPatternCommandBase* ULegacyXPatternCommand_PlaySpeech::MakeCommand(class UXSeqAct_InstancePattern* InstancePattern)
 {
 	UXPatternCommand_Speak* Result = NewObject<UXPatternCommand_Speak>(InstancePattern,NAME_None,RF_Transactional);
-	Result->Speaker = PossibleSpeakers->MakeObjectSet(InstancePattern);
-	if ( SpeechRequest->PlayEvent)
+	
+	if (PossibleSpeakers)
 	{
-		Result->Audio = Cast<USoundBase>(SpeechRequest->PlayEvent->ExportToContent());
+		Result->Speaker = PossibleSpeakers->MakeObjectSet(InstancePattern);
+		if ( SpeechRequest->PlayEvent)
+		{
+			Result->Audio = Cast<USoundBase>(SpeechRequest->PlayEvent->ExportToContent());
+		}
 	}
 	return Result;
 }
