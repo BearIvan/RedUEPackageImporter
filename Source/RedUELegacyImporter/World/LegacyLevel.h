@@ -1,12 +1,12 @@
 ﻿#pragma once
 
-#include "Actors/LegacyActor.h"
-#include "Containers/TransArray.h"
 #include "Core/LegacyObject.h"
 #include "LegacyLevel.generated.h"
 
 class ULegacyModel;
 class ULegacySequence;
+class ULegacyWorldInfo;
+class ULegacyActor;
 
 UCLASS()
 class REDUELEGACYIMPORTER_API ULegacyLevel : public ULegacyObject

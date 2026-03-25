@@ -20,7 +20,7 @@ class REDUELEGACYIMPORTER_API URedUELegacySubsystem : public UEditorSubsystem
 
 public:
                     URedUELegacySubsystem   ();
-    void            ObjectPreload			(ULegacyObject* Object);
+    void            ObjectPreload			(ULegacyObject* Object) const;
     void            ObjectsBeginLoad        ();
     void            ObjectsEndLoad          ();
     void            RefreshClasses          (ERedUELegacyEngineType CurrentEngineType, ERedUELegacyGameType CurrentGameType);

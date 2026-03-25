@@ -24,7 +24,11 @@ void ULegacyTexture2D::LegacySerialize(FRedUELegacyArchive& Ar)
 	}
 	Ar<<Mips;
 	
-	if (Ar.Game ==  ERedUELegacyGame::Bioshock3) return;
+	if (Ar.Game ==  ERedUELegacyGame::Bioshock3)
+	{
+		Ar.Seek(Ar.GetStopper());
+		return;
+	}
 	if (Ar.LegacyVer >= 567)
 	{
 		Ar << TextureFileCacheGuid;

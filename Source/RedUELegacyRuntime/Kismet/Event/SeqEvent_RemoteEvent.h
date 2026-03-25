@@ -17,9 +17,3 @@ public:
 	UPROPERTY(Transient)
 	USeqEvent_RemoteEvent* NextEvent;
 };
-
-UCLASS()
-class REDUELEGACYRUNTIME_API UXSeqEvent_RemoteEvent : public USeqEvent_RemoteEvent
-{
-	GENERATED_BODY()
-};

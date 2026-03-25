@@ -3,7 +3,6 @@
 #include "CoreMinimal.h"
 #include "Core/LegacyObject.h"
 #include "Material/LegacyMaterialInstance.h"
-#include "World/Components/LegacyBrushComponent.h"
 #include "LegacyModel.generated.h"
 
 

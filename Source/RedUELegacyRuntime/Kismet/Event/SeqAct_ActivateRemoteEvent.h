@@ -17,9 +17,3 @@ public:
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	FName EventName;
 };
-
-UCLASS()
-class REDUELEGACYRUNTIME_API UXSeqAct_ActivateRemoteEvent : public USeqAct_ActivateRemoteEvent
-{
-	GENERATED_BODY()
-};

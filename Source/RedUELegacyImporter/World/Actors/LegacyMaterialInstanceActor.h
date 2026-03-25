@@ -1,6 +1,5 @@
 ﻿#pragma once
-
-#include "LegacyActor.h"
+#include "Entities/LegacyActor.h"
 #include "LegacyMaterialInstanceActor.generated.h"
 
 /**

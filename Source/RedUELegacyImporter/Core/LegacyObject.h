@@ -35,7 +35,7 @@ struct TStructOpsTypeTraits<FLegacyRotator> : public TStructOpsTypeTraitsBase2<F
 
 
 USTRUCT(Blueprintable)
-struct FLegacyMatrix
+struct REDUELEGACYIMPORTER_API FLegacyMatrix
 {
 	GENERATED_BODY()
 

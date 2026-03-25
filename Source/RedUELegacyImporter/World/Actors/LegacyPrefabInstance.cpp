@@ -1,7 +1,7 @@
 ﻿#include "World/Actors/LegacyPrefabInstance.h"
 #include "Core/RedUELegacyArchive.h"
-#include "World/Actors/LegacyStaticMeshActor.h"
-#include "World/Components/LegacyStaticMeshComponent.h"
+#include "Entities/Primitive/StaticMesh/LegacyStaticMeshActor.h"
+#include "Entities/Primitive/StaticMesh/LegacyStaticMeshComponent.h"
 
 void ULegacyPrefabInstance::LegacySerialize(FRedUELegacyArchive& Ar)
 {

@@ -13,6 +13,7 @@
 #include "Editor/UnrealEdEngine.h"
 #include "Engine/LevelStreaming.h"
 #include "Engine/LevelStreamingAlwaysLoaded.h"
+#include "Entities/Engine/LegacyWorldInfo.h"
 #include "LevelInstance/LevelInstanceLevelStreaming.h"
 
 void ULegacyWorld::LegacySerialize(FRedUELegacyArchive& Ar)
@@ -41,7 +42,7 @@ void ULegacyWorld::ImportLevel(bool ReimportKismet)
 
 void ULegacyWorld::ImportWorld(TSet<FName> AllowLevels, TSet<FName> DenyLevels, bool AllowAlwaysLoadingLevel,bool ImportPersistentLevel,bool ReimportKismet)
 {
-	URedUELegacySubsystem* RedUELegacySubsystem = GEditor->GetEditorSubsystem<URedUELegacySubsystem>();
+	URedUELegacySubsystem* RedUELegacySubsystem = GetTypedOuter<URedUELegacySubsystem>();
 	auto FindOrCreateLevel = [this,RedUELegacySubsystem](FName InLevelName, bool& NeedOverride,bool IsKismetStreaming)-> ULevel*
 	{
 		UWorld* WorkingWorld = GWorld;

@@ -12,7 +12,18 @@ public class RedUELegacyImporter : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core", "MovieScene",
+				"Core", 
+				"MovieScene",
+				"CoreUObject",
+				"Engine",
+				"Slate",
+				"SlateCore",
+				"RenderCore",
+				"Projects",
+				"LevelSequence",
+				"MovieScene",
+				"Sequencer",
+				"BlueprintGraph",
 			}
 		);
 
@@ -21,12 +32,6 @@ public class RedUELegacyImporter : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"CoreUObject",
-				"Engine",
-				"Slate",
-				"SlateCore",
-				"RenderCore",
-				"Projects",
 				"UnrealEd",
 				"InputCore",
 				"MeshDescription",
@@ -39,14 +44,10 @@ public class RedUELegacyImporter : ModuleRules
 				"RedImage",
 				"EditorSubsystem",
 				"RedUELegacyRuntime",
-				"BlueprintGraph",
 				"KismetCompiler",
 				"AssetDefinition",
 				"Kismet",
 				"PropertyEditor",
-				"LevelSequence",
-				"MovieScene",
-				"Sequencer",
 				"MovieSceneTracks",
 				"MovieSceneTools",
 				"GraphEditor",
@@ -55,7 +56,8 @@ public class RedUELegacyImporter : ModuleRules
 				"UEOgg",
 				"Vorbis",
 				"VorbisFile",
-				"AudioEditor", "BSPUtils"
+				"AudioEditor", 
+				"BSPUtils"
 			}
 		);
 	}

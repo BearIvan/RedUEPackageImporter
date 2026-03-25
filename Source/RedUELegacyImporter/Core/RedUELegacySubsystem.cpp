@@ -9,9 +9,9 @@
 #include "Core/LegacyPackage.h"
 #include "Kismet/Base/SequenceAction.h"
 #include "Material/SingularityTextureFileCache.h"
+#include "Sequence/LegacySequenceObjects.h"
 #include "Sounds/WWiseBanksManager.h"
 #include "World/LegacyWorld.h"
-#include "World/Sequences/Object/LegacySequenceObjects.h"
 DEFINE_LOG_CATEGORY(LogRedUELegacy);
 
 URedUELegacySubsystem::URedUELegacySubsystem()
@@ -21,7 +21,7 @@ URedUELegacySubsystem::URedUELegacySubsystem()
     OutContentPath = TEXT("/Game");
 }
 
-void URedUELegacySubsystem::ObjectPreload(ULegacyObject* InObject)
+void URedUELegacySubsystem::ObjectPreload(ULegacyObject* InObject) const
 {
     if ( ObjectsLoaded.Contains(InObject))
     {

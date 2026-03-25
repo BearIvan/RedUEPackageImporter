@@ -1,11 +1,8 @@
 ﻿#include "Mesh/LegacyModel.h"
-
 #include "BSPOps.h"
 #include "BSPUtils.h"
-#include "Editor.h"
 #include "Core/RedUELegacyArchive.h"
-#include "Editor/EditorEngine.h"
-#include "World/Actors/LegacyActor.h"
+#include "Entities/LegacyActor.h"
 
 FRedUELegacyArchive& operator<<(FRedUELegacyArchive& Ar, FLegacyBspSurf& Surf)
 {

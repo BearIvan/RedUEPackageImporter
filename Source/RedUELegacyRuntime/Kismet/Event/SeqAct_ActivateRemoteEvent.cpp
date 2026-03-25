@@ -1,4 +1,4 @@
-﻿#include "SeqAct_ActivateRemoteEvent.h"
+﻿#include "Kismet/Event/SeqAct_ActivateRemoteEvent.h"
 
 #include "EngineUtils.h"
 #include "Kismet/Base/LegacyKismet.h"

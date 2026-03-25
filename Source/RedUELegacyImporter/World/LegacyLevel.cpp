@@ -1,18 +1,11 @@
 ﻿#include "World/LegacyLevel.h"
-
 #include "Editor.h"
-#include "Actors/XMatineeCameraActor.h"
-#include "Core/LegacyPackage.h"
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacySubsystem.h"
-#include "Engine/LevelScriptBlueprint.h"
+#include "Entities/LegacyActor.h"
 #include "Kismet/Base/LegacyKismet.h"
-#include "Kismet2/BlueprintEditorUtils.h"
-#include "Kismet2/KismetEditorUtilities.h"
 #include "Mesh/LegacyModel.h"
-#include "Subsystems/AssetEditorSubsystem.h"
-#include "World/LegacyWorld.h"
-#include "World/Sequences/LegacySequence.h"
+#include "Sequence/LegacySequence.h"
 
 void ULegacyLevel::LegacySerialize(FRedUELegacyArchive& Ar)
 {
@@ -54,10 +47,10 @@ void ULegacyLevel::ImportLevel(bool ReimportKismet)
                 if (Parent && Me)
                 {
                     FName SocketName = NAME_None;
-                    if (Parent->IsA<AXMatineeCameraActor>())
-                    {
-                        SocketName = "CameraDirect";
-                    }
+                    // if (Parent->IsA<AXMatineeCameraActor>())
+                    // {
+                    //     SocketName = "CameraDirect";
+                    // }
                     Me->AttachToActor(Parent,FAttachmentTransformRules::KeepWorldTransform,SocketName);
                 }
             }
@@ -71,7 +64,6 @@ void ULegacyLevel::ImportLevel(bool ReimportKismet)
         {
             ALegacyKismet*LevelKismet = GWorld->SpawnActor<ALegacyKismet>(KismetBlueprint->GeneratedClass);
             Sequence->FillActor(LevelKismet);
-            
         }
     }
     if (Model)
