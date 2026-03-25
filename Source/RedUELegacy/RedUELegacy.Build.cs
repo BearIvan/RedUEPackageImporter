@@ -7,7 +7,7 @@ public class RedUELegacy : ModuleRules
 	public RedUELegacy(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-		PrivatePCHHeaderFile = "Private/RedUELegacyPCH.h";
+		PrivatePCHHeaderFile = "RedUELegacyPCH.h";
 
 		PublicDependencyModuleNames.AddRange(
 			new string[]
@@ -16,6 +16,7 @@ public class RedUELegacy : ModuleRules
 			}
 		);
 
+        PublicIncludePaths.Add(ModuleDirectory);
 
 		PrivateDependencyModuleNames.AddRange(
 			new string[]

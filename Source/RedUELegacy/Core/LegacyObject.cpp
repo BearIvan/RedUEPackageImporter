@@ -1,13 +1,7 @@
-﻿#include "..\..\Public\Core\LegacyObject.h"
-
-#include <zconf.h>
-
-#include "ToolContextInterfaces.h"
-#include "..\..\Public\Core\RedUELegacyArchive.h"
+﻿#include "LegacyObject.h"
 #include "Core/LegacyPackage.h"
 #include "Core/LegacyTypeInfo.h"
 #include "Core/RedUELegacySubsystem.h"
-#include "World/Sequences/Object/LegacySequenceObjects.h"
 
 FLegacyRotator::operator FRotator()
 {

@@ -1,4 +1,5 @@
-﻿#include "..\..\Public\Core\LegacyTypeInfo.h"
+﻿#include "LegacyTypeInfo.h"
+
 #include "Core/RedUELegacyArchive.h"
 
 void ULegacyField::LegacySerialize(FRedUELegacyArchive& Ar)
