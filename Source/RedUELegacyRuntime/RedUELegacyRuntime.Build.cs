@@ -1,0 +1,44 @@
+﻿using UnrealBuildTool;
+
+public class RedUELegacyRuntime : ModuleRules
+{
+    public RedUELegacyRuntime(ReadOnlyTargetRules Target) : base(Target)
+    {
+        PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+
+        PublicDependencyModuleNames.AddRange(
+            new string[]
+            {
+                "Core",
+            }
+        );
+
+        PrivateDependencyModuleNames.AddRange(
+            new string[]
+            {
+                "CoreUObject",
+                "Engine",
+                "Slate",
+                "SlateCore",
+                "Projects",
+                "RenderCore",
+                "LevelSequence",
+                "MovieScene",
+                "MovieSceneTracks"
+            }
+        );
+        
+        PublicIncludePaths.Add(ModuleDirectory);
+        if (Target.bBuildEditor == true)
+        {
+            PrivateDependencyModuleNames.AddRange(
+                new string[]
+                {
+                    "BlueprintGraph",
+                    "UnrealEd",
+                    "MovieSceneTools",
+                }
+            );
+        }
+    }
+}

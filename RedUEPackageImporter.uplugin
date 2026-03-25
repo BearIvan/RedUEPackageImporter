@@ -17,7 +17,7 @@
 	"EnabledByDefault": true,
 	"Modules": [
 		{
-			"Name": "RedUELegacy",
+			"Name": "RedUELegacyImporter",
 			"Type": "UncookedOnly",
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
@@ -25,7 +25,7 @@
 			]
 		},
 		{
-			"Name": "RedUELegacyGame",
+			"Name": "RedUELegacyRuntime",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
 		}
