@@ -52,3 +52,11 @@ private:
 	UPROPERTY()
 	float CurrentTime = 0.f;
 };
+
+
+UCLASS()
+class REDUEBIOSHOCK3_API UXDLC2SeqAct_PlayScriptedSequence : public UXSeqAct_PlayScriptedSequence
+{
+	GENERATED_BODY()
+public:
+};

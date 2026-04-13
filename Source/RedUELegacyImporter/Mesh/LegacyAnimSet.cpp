@@ -1,5 +1,6 @@
 ﻿#include "Mesh/LegacyAnimSet.h"
 
+#include "Animation/AnimSequence.h"
 #include "Mesh/LegacyAnimSequence.h"
 
 void ULegacyAnimSet::ImportSequences(USkeleton* Skeleton)
@@ -19,6 +20,40 @@ void ULegacyAnimSet::ImportSequences(USkeleton* Skeleton)
 		}
 	}
 }
+
+bool ULegacyAnimSet::ContainsSequence(FName AnimName) const
+{
+	for (ULegacyAnimSequence* Sequence : Sequences)
+	{
+		if (Sequence->SequenceName == AnimName)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+UAnimSequenceBase* ULegacyAnimSet::FindOrImportSequence(USkeleton* Skeleton, FName AnimName)
+{
+	for (ULegacyAnimSequence* Sequence : Sequences)
+	{
+		if (Sequence->SequenceName == AnimName)
+		{
+			UAnimSequence** ImportedAnim = ImportedSequences.Find(Sequence);
+			if (!ImportedAnim)
+			{
+				ImportSequences(Skeleton);
+			}
+			ImportedAnim = ImportedSequences.Find(Sequence);
+			if (ImportedAnim)
+			{
+				return *ImportedAnim;
+			}
+		}
+	}
+	return nullptr;
+}
+
 
 void ULegacyAnimSet::ReImportSequences(USkeleton* Skeleton)
 {

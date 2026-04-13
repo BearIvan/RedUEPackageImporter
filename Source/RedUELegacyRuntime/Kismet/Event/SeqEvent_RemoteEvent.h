@@ -10,7 +10,7 @@ class REDUELEGACYRUNTIME_API USeqEvent_RemoteEvent : public USequenceEvent
 public:
 	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
 	FSequenceActionDelegate Out;
-
+	
 	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	FName EventName;
 	

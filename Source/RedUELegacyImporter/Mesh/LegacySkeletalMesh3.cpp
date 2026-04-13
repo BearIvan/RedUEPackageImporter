@@ -125,15 +125,9 @@ UObject* ULegacySkeletalMesh3::ExportToContent()
 	{
 		return PresentObject;
 	}
-	
-	const FString ObjectPath = GetOutContentPath() / GetLegacyFullName().Replace(TEXT("."),TEXT("/"));
-	const FString PackageName = UPackageTools::SanitizePackageName(ObjectPath);
-	const FString FullObjectPath = PackageName + TEXT(".") + FPaths::GetBaseFilename(PackageName);
-	USkeletalMesh* SkeletalMesh = LoadObject<USkeletalMesh>(nullptr, *FullObjectPath, nullptr, LOAD_NoWarn);
-	if (!SkeletalMesh)
+	USkeletalMesh* SkeletalMesh;
+	if(TryLoadOrCreate(SkeletalMesh))
 	{
-		UPackage* AssetPackage = CreatePackage(*PackageName);
-		SkeletalMesh = NewObject<USkeletalMesh>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public | RF_Standalone);
 		SkeletalMesh->PreEditChange(nullptr);
 		FAssetRegistryModule::AssetCreated(SkeletalMesh);
 		{
@@ -463,7 +457,7 @@ UObject* ULegacySkeletalMesh3::ExportToContent()
 					}
 				}
 			}
-			if (!CreateSkeletalMesh(SkeletalMesh, SkeletalMeshImportDataList, Bones, PackageName))
+			if (!CreateSkeletalMesh(SkeletalMesh, SkeletalMeshImportDataList, Bones, GetPackagePath()))
 			{
 				return nullptr;
 			}

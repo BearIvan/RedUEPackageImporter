@@ -274,6 +274,7 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSample::CreateExpression(UM
 		if (Texture)
 		{
 			Expression->Texture = CastChecked<UTexture>(Texture->ExportToContent(), ECastCheckedType::NullAllowed);
+			Expression->AutoSetSampleType();
 		}
 		SetExpressionInput(Expression->TextureObject, SamplerSource, Material, Parameters);
 		Expression->Desc = GetLegacyFullName();
@@ -307,6 +308,7 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameter2D::CreateEx
 		if (Texture)
 		{
 			Expression->Texture = CastChecked<UTexture>(Texture->ExportToContent(), ECastCheckedType::NullAllowed);
+			Expression->AutoSetSampleType();
 		}
 		SetExpressionInput(Expression->TextureObject, SamplerSource, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();
@@ -329,9 +331,10 @@ UMaterialExpression* ULegacyMaterialExpressionTextureSampleParameterCube::Create
 	{
 		UMaterialExpressionTextureSampleParameterCube* Expression = CreateExpressionTyped<UMaterialExpressionTextureSampleParameterCube>(Material);
 		SetExpressionInput(Expression->Coordinates, Coordinates, Material, Parameters);;
-		if (ensure(Texture))
+		if (Texture)
 		{
 			Expression->Texture = CastChecked<UTexture>(Texture->ExportToContent(), ECastCheckedType::NullAllowed);
+			Expression->AutoSetSampleType();
 		}
 		SetExpressionInput(Expression->TextureObject, SamplerSource, Material, Parameters);;
 		Expression->Desc = GetLegacyFullName();

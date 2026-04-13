@@ -9,15 +9,15 @@ class REDUELEGACYIMPORTER_API ULegacyField : public ULegacyObject
 
 public:
     virtual void    LegacySerialize(FRedUELegacyArchive& Ar) override;
-    
     UPROPERTY(Transient)
     ULegacyField* SuperField2;
     
     UPROPERTY(Transient)
     ULegacyField* Next;
+    
 };
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyEnum : public ULegacyField
 {
     GENERATED_BODY()
@@ -26,7 +26,7 @@ public:
     TArray<FName>	Names;
 };
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyConst : public ULegacyField
 {
     GENERATED_BODY()
@@ -35,7 +35,7 @@ public:
     FString			Value;
 };
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyFunction : public ULegacyField
 {
     GENERATED_BODY()
@@ -56,7 +56,7 @@ public:
 };
 
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyStruct : public ULegacyField
 {
     GENERATED_BODY()
@@ -81,7 +81,7 @@ public:
     ULegacyField* Children;
 };
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyScriptStruct : public ULegacyStruct
 {
     GENERATED_BODY()
@@ -89,27 +89,68 @@ public:
     virtual void    LegacySerialize(FRedUELegacyArchive& Ar) override;
 };
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyState  : public ULegacyStruct
 {
     GENERATED_BODY()
 public:
     virtual void    LegacySerialize(FRedUELegacyArchive& Ar) override;
-    int64			ProbeMask;
-    int64			IgnoreMask;
-    int				StateFlags;
-    uint16			LabelTableOffset;
+    int64			ProbeMask = 0;
+    int64			IgnoreMask = 0;
+    int32			StateFlags = 0;
+    int16           LabelTableOffset = 0;
+    UPROPERTY(Transient)
+    TMap<FName,ULegacyFunction*> FuncMap;
 };
-UCLASS()
+
+USTRUCT()
+struct FLegacyImplementedInterface
+{
+    GENERATED_BODY()
+    
+    UPROPERTY(Transient)
+    class ULegacyClass* Class = nullptr;
+   
+    UPROPERTY(Transient)
+    ULegacyProperty* PointerProperty = nullptr;
+    friend FArchive& operator<<(FArchive& Ar, FLegacyImplementedInterface& R);
+};
+
+
+
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyClass  : public ULegacyState
 {
     GENERATED_BODY()
 public:
-    virtual void    LegacySerialize(FRedUELegacyArchive& Ar) override;
+    virtual void        LegacySerialize(FRedUELegacyArchive& Ar) override;
+    uint32			    ClassFlags;
+    uint8			    ClassPlatformFlags;
+    FName			    ClassConfigName;
+    TArray<FName>		HideCategories;
+    TArray<FName>		AutoExpandCategories;
+    TArray<FName>		AutoCollapseCategories;
+    TArray<FName>		DontSortCategories;
+    TArray<FName>       DependentOn;
+    TArray<FName>		ClassGroupNames;
+    bool				bForceScriptOrder;
+    FString				ClassHeaderFilename;
+    
+    UPROPERTY(Transient)
+    UClass*	ClassWithin;
+    
+    UPROPERTY(Transient)
+    TMap<FName,class ULegacyObject*>	ComponentNameToDefaultObjectMap;
+    
+    UPROPERTY(Transient)
+    TArray<FLegacyImplementedInterface> Interfaces;
+    
+    UPROPERTY(Transient)
+    UObject*	ClassDefaultObject;
 };
 
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyProperty  : public ULegacyField
 {
     GENERATED_BODY()
@@ -126,8 +167,8 @@ public:
     
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyByteProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyByteProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 public:
@@ -138,27 +179,27 @@ public:
 };
 
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyIntProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyIntProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 };
 
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyBoolProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyBoolProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyFloatProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyFloatProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyObjectProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyObjectProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 public:
@@ -168,8 +209,8 @@ public:
     ULegacyClass* PropertyClass;
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyClassProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyClassProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 public:
@@ -179,20 +220,20 @@ public:
     ULegacyClass* MetaClass;
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyNameProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyNameProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyStrProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyStrProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyArrayProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyArrayProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 public:
@@ -202,8 +243,8 @@ public:
     ULegacyProperty* Inner;
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyMapProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyMapProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 public:
@@ -216,8 +257,8 @@ public:
     ULegacyProperty* Value;
 };
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyStructProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyStructProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 public:
@@ -228,8 +269,8 @@ public:
 };
 
 
-UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyComponentProperty  : public ULegacyField
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyComponentProperty  : public ULegacyProperty
 {
     GENERATED_BODY()
 public:
@@ -239,8 +280,38 @@ public:
     ULegacyObject* SomeName;
 };
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Core))
 class REDUELEGACYIMPORTER_API ULegacyPointerProperty : public ULegacyProperty
+{
+    GENERATED_BODY()
+};
+
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyInterface : public ULegacyObject
+{
+    GENERATED_BODY()
+};
+
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacySubsystem : public ULegacyObject
+{
+    GENERATED_BODY()
+};
+
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyDelegateProperty : public ULegacyProperty
+{
+    GENERATED_BODY()
+};
+
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyQwordProperty : public ULegacyProperty
+{
+    GENERATED_BODY()
+};
+
+UCLASS(meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyInterfaceProperty : public ULegacyProperty
 {
     GENERATED_BODY()
 };

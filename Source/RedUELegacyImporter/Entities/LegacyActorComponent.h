@@ -2,15 +2,14 @@
 #include "Core/LegacyObject.h"
 #include "LegacyActorComponent.generated.h"
 
-UCLASS(EditInlineNew,DefaultToInstanced)
-class REDUELEGACYIMPORTER_API ULegacyActorComponent : public ULegacyObject
+
+UCLASS(Blueprintable)
+class REDUELEGACYIMPORTER_API ULegacyActorComponent : public ULegacyComponent
 {
     GENERATED_BODY()
 public:
-    virtual void LegacySerializeComponent(FArchive& Ar) override;
-    virtual bool IsAComponent() override { return true; }
     
-    UFUNCTION(BlueprintNativeEvent)
+    UFUNCTION(BlueprintCallable,BlueprintNativeEvent,Category="ReUE|Legacy")
     void FillComponent(UActorComponent* InActorComponent);
     
     UPROPERTY(BlueprintReadWrite)

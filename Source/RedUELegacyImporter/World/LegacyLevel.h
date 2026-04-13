@@ -8,7 +8,7 @@ class ULegacySequence;
 class ULegacyWorldInfo;
 class ULegacyActor;
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Engine))
 class REDUELEGACYIMPORTER_API ULegacyLevel : public ULegacyObject
 {
     GENERATED_BODY()

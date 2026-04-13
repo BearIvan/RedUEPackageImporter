@@ -34,3 +34,10 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	bool BlockActors = false;
 };
+
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacyMeshComponent : public ULegacyPrimitiveComponent
+{
+	GENERATED_BODY()
+};

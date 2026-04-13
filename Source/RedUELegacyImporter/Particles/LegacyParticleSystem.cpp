@@ -84,15 +84,11 @@ UObject* ULegacyParticleSystem::ExportToContent()
 	if(PresentObject)
 	{
 		return PresentObject;
-	}
-	const FString ObjectPath = GetOutContentPath()/ GetLegacyFullName().Replace(TEXT("."),TEXT("/"));
-	const FString PackageName = UPackageTools::SanitizePackageName(ObjectPath);
-	const FString FullObjectPath = PackageName + TEXT(".") + FPaths::GetBaseFilename(PackageName);
-	UParticleSystem* Result = LoadObject<UParticleSystem>(nullptr, *FullObjectPath,nullptr,LOAD_NoWarn);
-	if(!Result)
+	};
+	UParticleSystem* Result;
+	if(TryLoadOrCreate(Result))
 	{
-		UPackage*  AssetPackage = CreatePackage(*PackageName);
-		UParticleSystem* NewParticleSystem = NewObject<UParticleSystem>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
+		UParticleSystem* NewParticleSystem = Result;
 		NewParticleSystem->PreEditChange(nullptr);
 
 		NewParticleSystem->LODSettings.AddUninitialized(LODDistances.Num());

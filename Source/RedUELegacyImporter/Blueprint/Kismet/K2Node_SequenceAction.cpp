@@ -9,7 +9,9 @@
 #include "K2Node_CustomEvent.h"
 #include "KismetCompiler.h"
 #include "LegacyKismetCompilerContext.h"
+#include "LegacyKismetGraphEditorCommands.h"
 #include "ScopedTransaction.h"
+#include "ToolMenu.h"
 #include "Kismet/Base/LegacyKismet.h"
 #include "Kismet/Base/SequenceAction.h"
 #include "Kismet2/BlueprintEditorUtils.h"
@@ -84,8 +86,11 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 	UClass*ActionClass = Action->GetClass();
 	
 	LegacyIndexToInputPin.Empty();
+	LegacyNameToInputPin.Empty();
 	LegacyIndexToOutputPin.Empty();
+	LegacyNameToOutputPin.Empty();
 	LegacyIndexToVariableName.Empty();
+	LegacyNameToVariableName.Empty();
 	CustomLinkToIndex.Empty();
 	for (TFieldIterator<UFunction>  FunctionIT(ActionClass); FunctionIT; ++FunctionIT)
 	{
@@ -95,6 +100,10 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 			if (FunctionIT->HasMetaData(TEXT("LegacyIndex")))
 			{
 				LegacyIndexToInputPin.Add(FunctionIT->GetIntMetaData(TEXT("LegacyIndex")),FunctionIT->GetFName());
+			}
+			if (FunctionIT->HasMetaData(TEXT("LegacyName")))
+			{
+				LegacyNameToInputPin.Add(FunctionIT->GetMetaData(TEXT("LegacyName")),FunctionIT->GetFName());
 			}
 		}
 	}
@@ -106,9 +115,10 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 		{
 			if (LinkProperty->HasMetaData(TEXT("KismetLinkCount")))
 			{
-				if (!ensure(LegacyIndexToOutputPin.Num() == 0))
+				if (!ensure(LegacyIndexToOutputPin.Num() == 0 && LegacyNameToOutputPin.Num() == 0))
 				{
 					LegacyIndexToOutputPin.Empty();
+					LegacyNameToOutputPin.Empty();
 				}
 				int32 LinkCount = *LinkProperty->GetPropertyValuePtr_InContainer(Action);
 				for (int32 LinkIndex = 0; LinkIndex < LinkCount; ++LinkIndex)
@@ -135,12 +145,20 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 			{
 				LegacyIndexToOutputPin.Add(Property->GetIntMetaData(TEXT("LegacyIndex")),Property->GetFName());
 			}
+			if (Property->HasMetaData(TEXT("LegacyName")))
+			{
+				LegacyNameToOutputPin.Add(Property->GetMetaData(TEXT("LegacyName")),Property->GetFName());
+			}
 		}
 		else if (PropertyIt->HasMetaData(TEXT("KismetExternalVariable")))
 		{
 			if (PropertyIt->HasMetaData(TEXT("LegacyIndex")))
 			{
 				LegacyIndexToVariableName.Add(PropertyIt->GetIntMetaData(TEXT("LegacyIndex")),PropertyIt->GetFName());
+			}
+			if (PropertyIt->HasMetaData(TEXT("LegacyName")))
+			{
+				LegacyNameToVariableName.Add(PropertyIt->GetMetaData(TEXT("LegacyName")),PropertyIt->GetFName());
 			}
 		}
 		else if (PropertyIt->HasMetaData(TEXT("KismetEvent")))
@@ -178,7 +196,6 @@ void UK2Node_SequenceAction::AllocateDefaultPins()
 void UK2Node_SequenceAction::ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph)
 {
 	Super::ExpandNode(CompilerContext, SourceGraph);
-	static_cast<FLegacyKismetCompilerContext&>(CompilerContext).Actions.Add(this);
 	
 	const UEdGraphSchema_K2* Schema = CompilerContext.GetSchema();
 	check(SourceGraph && Schema);
@@ -188,8 +205,7 @@ void UK2Node_SequenceAction::ExpandNode(FKismetCompilerContext& CompilerContext,
 	{
 		return;
 	}
-	Action->InitializeDelegates.Empty();
-	
+
 	UClass* ActionClass = Action->GetClass();
 	
 	for (UEdGraphPin* CurrentPin : Pins)
@@ -247,8 +263,6 @@ void UK2Node_SequenceAction::ExpandNode(FKismetCompilerContext& CompilerContext,
 				CurrentCENode->CustomFunctionName = *FString::Printf(TEXT("%s_%s"), *CurrentPin->GetName(), *CompilerContext.GetGuid(this));
 				CurrentCENode->AllocateDefaultPins();
 				bIsErrorFree &= CompilerContext.MovePinLinksToIntermediate(*CurrentPin, *CurrentCENode->FindPinChecked(UEdGraphSchema_K2::PN_Then)).CanSafeConnect();
-				Action->InitializeDelegates.Add(CurrentPin->PinName,CurrentCENode->CustomFunctionName);
-				Action->InitializeCustomLinks.Add(CustomLinkToIndex[CurrentPin->PinName],CurrentCENode->CustomFunctionName);
 			}
 			else
 			{
@@ -258,17 +272,13 @@ void UK2Node_SequenceAction::ExpandNode(FKismetCompilerContext& CompilerContext,
 					CurrentCENode->CustomFunctionName = *FString::Printf(TEXT("%s_%s"), *CurrentPin->GetName(), *CompilerContext.GetGuid(this));
 					CurrentCENode->AllocateDefaultPins();
 					bIsErrorFree &= CompilerContext.MovePinLinksToIntermediate(*CurrentPin, *CurrentCENode->FindPinChecked(UEdGraphSchema_K2::PN_Then)).CanSafeConnect();
-					Action->InitializeDelegates.Add(CurrentPin->PinName,CurrentCENode->CustomFunctionName);
 				}
 			}
 			
 		}
 	}
-	if (FArrayProperty* InputEventsProperty =  CastField<FArrayProperty>(ActionClass->FindPropertyByName(InputEventsName)))
+	if (CastField<FArrayProperty>(ActionClass->FindPropertyByName(InputEventsName)))
 	{
-		FScriptArrayHelper_InContainer InputEventsArray(InputEventsProperty,Action);
-		InputEventsArray.EmptyValues();
-		TSet<FGuid> InputEventsGuids;
 		for (UEdGraphPin* CurrentPin : Pins)
 		{
 			if (CurrentPin && CurrentPin->Direction == EGPD_Input && CurrentPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Delegate&& CurrentPin->LinkedTo.Num() > 0)
@@ -316,13 +326,6 @@ void UK2Node_SequenceAction::ExpandNode(FKismetCompilerContext& CompilerContext,
 						CompilerContext.MessageLog.Error(*FormattedMessage, this);
 						return;
 					}
-					if (InputEventsGuids.Contains(InSequenceAction->NodeGuid))
-					{
-						continue;
-					}
-					InputEventsGuids.Add(InSequenceAction->NodeGuid);
-					FGuid* ActionGuid = reinterpret_cast<FGuid*>( InputEventsArray.GetRawPtr(InputEventsArray.AddValue()));
-					*ActionGuid = InSequenceAction->NodeGuid;
 				}
 			}
 		}
@@ -427,6 +430,64 @@ TSharedPtr<SGraphNode> UK2Node_SequenceAction::CreateVisualWidget()
 	return SNew(SGraphNodeK2SequenceAction, this);
 }
 
+void UK2Node_SequenceAction::FillAction(USequenceAction* ToAction, FKismetCompilerContext& CompilerContext)
+{
+	if (!ToAction || !Action)
+	{
+		return;
+	}
+
+	ToAction->InitializeDelegates.Empty();
+	ToAction->InitializeCustomLinks.Empty();
+
+	for (UEdGraphPin* CurrentPin : Pins)
+	{
+		if (!CurrentPin || CurrentPin->Direction != EGPD_Output || CurrentPin->PinType.PinCategory != UEdGraphSchema_K2::PC_Exec || CurrentPin->LinkedTo.Num() == 0)
+		{
+			continue;
+		}
+
+		const FName CustomFunctionName = *FString::Printf(TEXT("%s_%s"), *CurrentPin->GetName(), *CompilerContext.GetGuid(this));
+		ToAction->InitializeDelegates.Add(CurrentPin->PinName, CustomFunctionName);
+
+		if (const int32* LinkIndex = CustomLinkToIndex.Find(CurrentPin->PinName))
+		{
+			ToAction->InitializeCustomLinks.Add(*LinkIndex, CustomFunctionName);
+		}
+	}
+
+	if (FArrayProperty* InputEventsProperty = CastField<FArrayProperty>(ToAction->GetClass()->FindPropertyByName(InputEventsName)))
+	{
+		FScriptArrayHelper_InContainer InputEventsArray(InputEventsProperty, ToAction);
+		InputEventsArray.EmptyValues();
+
+		TSet<FGuid> InputEventsGuids;
+		for (UEdGraphPin* CurrentPin : Pins)
+		{
+			if (!CurrentPin || CurrentPin->Direction != EGPD_Input || CurrentPin->PinType.PinCategory != UEdGraphSchema_K2::PC_Delegate || CurrentPin->LinkedTo.Num() == 0)
+			{
+				continue;
+			}
+
+			ensure(CurrentPin->LinkedTo.Num() == 1);
+			if (UEdGraphPin* LinkedPin = CurrentPin->LinkedTo[0])
+			{
+				if (UK2Node_SequenceAction* InSequenceAction = Cast<UK2Node_SequenceAction>(LinkedPin->GetOwningNode()))
+				{
+					if (InputEventsGuids.Contains(InSequenceAction->NodeGuid))
+					{
+						continue;
+					}
+
+					InputEventsGuids.Add(InSequenceAction->NodeGuid);
+					FGuid* ActionGuid = reinterpret_cast<FGuid*>(InputEventsArray.GetRawPtr(InputEventsArray.AddValue()));
+					*ActionGuid = InSequenceAction->NodeGuid;
+				}
+			}
+		}
+	}
+}
+
 bool UK2Node_SequenceAction::CanAddEventPin() const
 {
 	if (!Action)
@@ -478,7 +539,7 @@ void UK2Node_SequenceAction::CreateEventPin()
 	EventPinsCount++;
 }
 
-void UK2Node_SequenceAction::RemoveEventPin(UEdGraphPin* InGraphPin)
+void UK2Node_SequenceAction::RemoveEventPin(const UEdGraphPin* InGraphPin)
 {
 	const FScopedTransaction Transaction( NSLOCTEXT("RedUELegacy","DeleteSequenceActionEvent_Transaction", "Delete Event Input") );
 	Modify();
@@ -490,8 +551,8 @@ void UK2Node_SequenceAction::RemoveEventPin(UEdGraphPin* InGraphPin)
 	{
 		if (InGraphPin == EventPins[OutputIndex])
 		{
-			InGraphPin->MarkAsGarbage();
-			Pins.Remove(InGraphPin);
+			EventPins[OutputIndex]->MarkAsGarbage();
+			Pins.Remove(EventPins[OutputIndex]);
 			EventPinsCount--;
 			break;
 		}
@@ -533,6 +594,39 @@ UEdGraphPin* UK2Node_SequenceAction::GetEventOutput()
 		}
 	}
 	return nullptr;
+}
+
+void UK2Node_SequenceAction::OnRemoveEventPin(const UEdGraphPin* InGraphPin)
+{
+	if (InGraphPin && InGraphPin->Direction == EGPD_Input&&InGraphPin->PinType.PinCategory == UEdGraphSchema_K2::PC_Delegate)
+	{
+		RemoveEventPin(InGraphPin);
+	}
+}
+
+void UK2Node_SequenceAction::GetNodeContextMenuActions(UToolMenu* Menu, UGraphNodeContextMenuContext* Context) const
+{
+	Super::GetNodeContextMenuActions(Menu, Context);
+	
+	const UEdGraph* CurrentGraph = Context->Graph;
+	const UEdGraphNode* InGraphNode = Context->Node;
+	const UEdGraphPin* InGraphPin = Context->Pin;
+	const bool bIsDebugging = Context->bIsDebugging;
+	
+	if (!bIsDebugging && InGraphPin && InGraphNode == this)
+	{
+		if (InGraphPin->Direction == EGPD_Input && InGraphPin->PinType.PinCategory  == UEdGraphSchema_K2::PC_Delegate)
+		{
+			FToolMenuSection& Section = Menu->FindOrAddSection("EditPin");
+			Section.AddMenuEntry(
+			"RemoveEventPin",
+			NSLOCTEXT("ReUELegacy","RemoveEventPin", "Remove event pin" ),
+			NSLOCTEXT("ReUELegacy","RemoveEventPinTooltip", "" ),FSlateIcon(),FUIAction(
+			FExecuteAction::CreateUObject( const_cast<UK2Node_SequenceAction*>(this), &UK2Node_SequenceAction::OnRemoveEventPin,InGraphPin))
+			);
+		}
+	}
+	
 }
 
 class FNodeHandlingFunctor* UK2Node_SequenceAction::CreateNodeHandler(class FKismetCompilerContext& CompilerContext) const

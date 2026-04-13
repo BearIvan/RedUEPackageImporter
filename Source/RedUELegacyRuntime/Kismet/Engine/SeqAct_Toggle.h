@@ -28,8 +28,8 @@ public:
 	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Actors);
 	
 	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1 ))
-	bool Bool;
+	TArray<bool> Booleans;
 
-	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Bool);
+	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Booleans);
 	
 };

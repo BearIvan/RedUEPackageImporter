@@ -1,8 +1,10 @@
 ﻿#pragma once
+#include "LegacyObject.h"
 #include "RedUELegacyArchive.h"
 #include "LegacyPackage.generated.h"
 
 class ULegacyObject;
+class ULegacyClass;
 
 struct FRedUELegacyGenerationInfo
 {
@@ -245,13 +247,14 @@ struct FRedUELegacyIntBulkData : public FRedUELegacyByteBulkData
 		return 4;
 	}
 };
-UCLASS(BlueprintType)
-class REDUELEGACYIMPORTER_API ULegacyPackage:public UObject,public FRedUELegacyArchive
+UCLASS(BlueprintType, meta = (LegacyPackage = Core))
+class REDUELEGACYIMPORTER_API ULegacyPackage:public ULegacyObject,public FRedUELegacyArchive
 {
 	GENERATED_BODY()
 public:
 									ULegacyPackage	    ();
 	void							BeginDestroy		() override;
+	void							PostLoadPackage		();
 	bool							LoadPackage			(const TCHAR*FileName);
 	void							ClosePackage		();
 	
@@ -266,6 +269,12 @@ public:
     virtual void                    SetStopper          (int32 Pos) override;
     virtual void                    PushStopper         () override;
     virtual void                    PopStopper          () override;
+	
+	virtual void					LegacySerialize		(FRedUELegacyArchive& Ar) override;
+	virtual UObject*				ExportToContent		() override;
+
+	UClass*							FindNearestClass	(int32 Index);
+	UClass*							FindNearestClass	(ULegacyClass* LegacyClass);
 	
 	ULegacyObject*                  GetOrCreateImport	(int32 Index);
     ULegacyObject*                  GetOrCreateExport   (int32 Index);
@@ -313,6 +322,22 @@ public:
             return NAME_Class;
         }
     }
+	
+	FName GetPackageName(int32 PackageIndex) const	//?? GetExportClassName()
+	{
+		if (PackageIndex < 0)
+		{
+			return GetObjectName(GetImport(-PackageIndex-1).PackageIndex);
+		}
+		else if (PackageIndex > 0)
+		{
+			return GetObjectName(GetExport(PackageIndex-1).PackageIndex);
+		}
+		else 
+		{
+			return NAME_Class;
+		}
+	}
     
     FRedUELegacyPackageFileSummary	Summary;
     bool							bIsLoaded = false;
@@ -327,17 +352,20 @@ public:
     
     UPROPERTY(BlueprintReadOnly)
     ERedUELegacyEngineType EngineType;
-    
 private:
     void                            LoadNameTable       ();
     void                            LoadImportTable     ();
     void                            LoadExportTable     ();
 
-    TArray<FString>                 NameTable;
+private:
+	TArray<FString>                 NameTable;
 	IFileHandle*					FileHandle;
     int32                           Stopper = INDEX_NONE;
     TArray<int32>                   StoppersSaved;
-    
+	
+	UPROPERTY(Transient)
+	TArray<ULegacyObject*> Objects;
+	
     UPROPERTY(Transient)
 	TArray<FRedUELegacyObjectExport> ExportTable;
 	

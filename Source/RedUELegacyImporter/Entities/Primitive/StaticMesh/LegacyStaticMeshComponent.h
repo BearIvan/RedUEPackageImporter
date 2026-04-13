@@ -6,7 +6,7 @@
 
 
 UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyStaticMeshComponent : public ULegacyPrimitiveComponent
+class REDUELEGACYIMPORTER_API ULegacyStaticMeshComponent : public ULegacyMeshComponent
 {
     GENERATED_BODY()
 public:

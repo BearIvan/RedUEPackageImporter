@@ -144,16 +144,10 @@ UObject* ULegacyStaticMesh3::ExportToContent()
 	{
 		return PresentObject;
 	}
-    const FString ObjectPath = GetOutContentPath() / GetLegacyFullName().Replace(TEXT("."),TEXT("/"));
-    const FString PackageName = UPackageTools::SanitizePackageName(ObjectPath);
-    const FString FullObjectPath = PackageName + TEXT(".") + FPaths::GetBaseFilename(PackageName);
-    UStaticMesh* StaticMesh = LoadObject<UStaticMesh>(nullptr, *FullObjectPath,nullptr,LOAD_NoWarn);
-    if(!StaticMesh)
-    {
-        
-        UPackage*  AssetPackage = CreatePackage(*PackageName);
-        StaticMesh = NewObject<UStaticMesh>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
-        StaticMesh->PreEditChange(nullptr);
+	UStaticMesh* StaticMesh;
+	if(TryLoadOrCreate(StaticMesh))
+	{
+		StaticMesh->PreEditChange(nullptr);
         FAssetRegistryModule::AssetCreated(StaticMesh);
         TArray<FStaticMaterial> Materials;
         for (int32 LodIndex = 0; LodIndex < Lods.Num(); LodIndex++)

@@ -1,11 +1,13 @@
 ﻿#pragma once
+#include "Engine/LevelScriptActor.h"
 
 #include "LegacyKismet.generated.h"
 
 class USeqEvent_RemoteEvent;
+class USequenceAction;
 
 UCLASS()
-class REDUELEGACYRUNTIME_API ALegacyKismet : public AActor
+class REDUELEGACYRUNTIME_API ALegacyKismet : public ALevelScriptActor
 {
 	GENERATED_BODY()
 

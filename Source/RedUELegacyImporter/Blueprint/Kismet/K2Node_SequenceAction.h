@@ -21,15 +21,17 @@ public:
 	virtual bool						IsNodeRootSet				() const override;
 	virtual class FNodeHandlingFunctor* CreateNodeHandler			(class FKismetCompilerContext& CompilerContext) const override;
 	virtual TSharedPtr<SGraphNode>		CreateVisualWidget			() override;
-
+			
+			void						FillAction					(USequenceAction* ToAction, FKismetCompilerContext& CompilerContext);
 			bool						CanAddEventPin				() const;
 			void						AddEventPin					();
 			void						CreateEventPins				();
 			void						CreateEventPin				();
-			void						RemoveEventPin				(UEdGraphPin* InGraphPin);
+			void						RemoveEventPin				(const UEdGraphPin* InGraphPin);
 			void						GetEventPins				(TArray<UEdGraphPin*>& OutPins);
 			UEdGraphPin*				GetEventOutput				();
-			
+			void						OnRemoveEventPin			(const UEdGraphPin* InGraphPin);
+	virtual void						GetNodeContextMenuActions	(UToolMenu* Menu, UGraphNodeContextMenuContext* Context) const override;
 
 
 	UPROPERTY(VisibleAnywhere,Instanced)
@@ -39,13 +41,22 @@ public:
 	TMap<int32,FName> LegacyIndexToInputPin;
 	
 	UPROPERTY()
+	TMap<FString,FName> LegacyNameToInputPin;
+	
+	UPROPERTY()
 	TMap<int32,FName> LegacyIndexToOutputPin;
+	
+	UPROPERTY()
+	TMap<FString,FName> LegacyNameToOutputPin;
 	
 	UPROPERTY()
 	TMap<FName,int32> CustomLinkToIndex;
 	
 	UPROPERTY()
 	TMap<int32,FName> LegacyIndexToVariableName;
+	
+	UPROPERTY()
+	TMap<FString,FName> LegacyNameToVariableName;
 
 	UPROPERTY()
 	FName InputEventsName;

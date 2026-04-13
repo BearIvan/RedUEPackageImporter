@@ -1,24 +1,15 @@
 ﻿#pragma once
 
+#include "LegacyXAKAudioID.h"
 #include "Core/LegacyObject.h"
+#include "Core/LegacyXEffect.h"
 #include "LegacyXSound.generated.h"
 
 
 
-UCLASS()
-class REDUEBIOSHOCK3IMPORTER_API ULegacyXAKAudioEventID : public ULegacyObject
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(BlueprintReadWrite)
-	int32 Id;
-	
-	virtual UObject* ExportToContent() override;
-};
-
 
 UCLASS()
-class REDUEBIOSHOCK3IMPORTER_API ULegacyXEffectSound : public ULegacyObject
+class REDUEBIOSHOCK3IMPORTER_API ULegacyXEffectSound : public ULegacyXEffect
 {
 	GENERATED_BODY()
 public:

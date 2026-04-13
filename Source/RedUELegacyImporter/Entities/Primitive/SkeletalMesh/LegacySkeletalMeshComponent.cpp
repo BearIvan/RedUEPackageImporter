@@ -3,6 +3,24 @@
 #include "Mesh/LegacyAnimSet.h"
 #include "Mesh/LegacySkeletalMesh3.h"
 
+UAnimSequenceBase* ULegacySkeletalMeshComponent::GetAnimSequence(FName AnimName)
+{
+	if(SkeletalMesh)
+	{
+		if(USkeletalMesh* InSkeletalMesh = CastChecked<USkeletalMesh>(SkeletalMesh->ExportToContent(),ECastCheckedType::NullAllowed))
+		{
+			for (ULegacyAnimSet*AnimSet:AnimSets)
+			{
+				if (AnimSet && AnimSet->ContainsSequence(AnimName))
+				{
+					return AnimSet->FindOrImportSequence(InSkeletalMesh->GetSkeleton(), AnimName);
+				}
+			}
+		}
+	}
+	return nullptr;
+}
+
 void ULegacySkeletalMeshComponent::FillComponent_Implementation(UActorComponent* InActorComponent)
 {
 	Super::FillComponent_Implementation(InActorComponent);

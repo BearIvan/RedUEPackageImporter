@@ -1,12 +1,9 @@
 ﻿#include "LegacyKismet.h"
 
 #include "EngineUtils.h"
-#include "LegacyKismetGeneratedClass.h"
 #include "SequenceAction.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/Event/SeqEvent_RemoteEvent.h"
-
-class ULegacyKismetGeneratedClass;
 
 ALegacyKismet::ALegacyKismet()
 {
@@ -16,27 +13,47 @@ ALegacyKismet::ALegacyKismet()
 
 void ALegacyKismet::BeginPlay()
 {
-	if (ULegacyKismetGeneratedClass* KismetGeneratedClass = Cast<ULegacyKismetGeneratedClass>(GetClass()))
+	// if (const ALegacyKismet* LegacyKismetCDO = GetClass()->GetDefaultObject<ALegacyKismet>())
+	// {
+	// 	for (const auto& [Key, Value] : LegacyKismetCDO->StartupActions)
+	// 	{
+	// 		USequenceAction* NewAction = SequenceActions.Add(Key, DuplicateObject(Value, this));
+	// 		NewAction->Construct();
+	// 		if (USeqEvent_RemoteEvent* RemoveEvent = Cast<USeqEvent_RemoteEvent>(NewAction))
+	// 		{
+	// 			if (USeqEvent_RemoteEvent** RemoteEvent = SequenceRemoteEvents.Find(RemoveEvent->EventName))
+	// 			{
+	// 				USeqEvent_RemoteEvent* CurrentEvent = *RemoteEvent;
+	// 				for (;CurrentEvent->NextEvent;CurrentEvent = CurrentEvent->NextEvent){}
+	// 				CurrentEvent->NextEvent = RemoveEvent;
+	// 			}
+	// 			else
+	// 			{
+	// 				SequenceRemoteEvents.Add(RemoveEvent->EventName, RemoveEvent);
+	// 			}
+	// 		}
+	// 	}
+	// }
+	
+	SequenceRemoteEvents.Empty();
+	for (auto& [Key, Value] : SequenceActions)
 	{
-		for (auto & [Key,Value] :KismetGeneratedClass->StartupActions)
+		Value->Construct();
+		if (USeqEvent_RemoteEvent* RemoveEvent = Cast<USeqEvent_RemoteEvent>(Value))
 		{
-			USequenceAction* NewAction = SequenceActions.Add(Key,DuplicateObject(Value,this));
-			NewAction->Construct();
-			if (USeqEvent_RemoteEvent* RemoveEvent = Cast<USeqEvent_RemoteEvent>(NewAction))
+			if (USeqEvent_RemoteEvent** RemoteEvent = SequenceRemoteEvents.Find(RemoveEvent->EventName))
 			{
-				if (USeqEvent_RemoteEvent** RemoteEvent = SequenceRemoteEvents.Find(RemoveEvent->EventName))
-				{
-					USeqEvent_RemoteEvent* CurrentEvent = *RemoteEvent;
-					for (;CurrentEvent->NextEvent;CurrentEvent = CurrentEvent->NextEvent){}
-					CurrentEvent->NextEvent = RemoveEvent;
-				}
-				else
-				{
-					SequenceRemoteEvents.Add(RemoveEvent->EventName,RemoveEvent);
-				}
+				USeqEvent_RemoteEvent* CurrentEvent = *RemoteEvent;
+				for (;CurrentEvent->NextEvent;CurrentEvent = CurrentEvent->NextEvent){}
+				CurrentEvent->NextEvent = RemoveEvent;
+			}
+			else
+			{
+				SequenceRemoteEvents.Add(RemoveEvent->EventName, RemoveEvent);
 			}
 		}
 	}
+	
 	PlayerController = UGameplayStatics::GetPlayerController(GetWorld(),0);
 	Super::BeginPlay();
 }
@@ -78,7 +95,7 @@ void ALegacyKismet::Tick(float DeltaTime)
 	}
 	
 
-	
+
 }
 
 void ALegacyKismet::ActivateRemoteEvent(const FName& InName)

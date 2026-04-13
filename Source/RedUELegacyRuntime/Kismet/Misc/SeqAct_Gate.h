@@ -27,6 +27,9 @@ public:
 	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
 	FSequenceActionDelegate Out;
 	
+	UPROPERTY(BlueprintAssignable,meta = (LegacyName = "Closed"))
+	FSequenceActionDelegate Closed;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 AutoCloseCount = 0;
 	

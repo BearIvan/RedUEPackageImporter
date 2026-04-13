@@ -4,6 +4,7 @@
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
 #include "IDetailGroup.h"
+#include "LegacyKismetNodeBindingExtension.h"
 #include "ObjectEditorUtils.h"
 #include "Blueprint/Kismet/K2Node_SequenceAction.h"
 #include "Kismet/Base/SequenceAction.h"
@@ -24,6 +25,12 @@ void FSequenceActionDetails::CustomizeDetails(class IDetailLayoutBuilder& Detail
 		return;
 	}
 
+	//TODO: Пиздец какой кастыль !!!!
+	if (DetailBuilder.GetDetailsView()->GetExtensionHandler() == nullptr)
+	{
+		DetailBuilder.GetDetailsView()->SetExtensionHandler(MakeShared<FLegacyKismetNodeBindingExtension>());
+	}
+	
 	UClass* SequenceActionClass = nullptr;
 	USequenceAction* FirstSequenceAction = nullptr;
 	for (TWeakObjectPtr<UObject> SelectionObject: SelectedObjectsList)

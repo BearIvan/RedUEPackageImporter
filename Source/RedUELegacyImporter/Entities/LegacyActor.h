@@ -3,7 +3,7 @@
 #include "LegacyActor.generated.h"
 
 
-UCLASS()
+UCLASS(Blueprintable)
 class REDUELEGACYIMPORTER_API ULegacyActor : public ULegacyObject
 {
     GENERATED_BODY()
@@ -11,6 +11,8 @@ public:
 	
 	virtual void LegacySerialize(FRedUELegacyArchive& Ar) override;
 
+	virtual UObject* ExportToContent() override;
+	
 	UFUNCTION(BlueprintNativeEvent)
     UClass* GetActorClass();
 	
@@ -19,8 +21,8 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent)
 	void FillActor( AActor* InActor);
-	    
-	UPROPERTY(BlueprintReadWrite)
+
+    UPROPERTY(BlueprintReadWrite)
 	FLegacyRotator Rotation;
     
 	UPROPERTY(BlueprintReadWrite)
@@ -40,5 +42,11 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	float DrawScale = 1;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName Group;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FName Tag;
 };
 

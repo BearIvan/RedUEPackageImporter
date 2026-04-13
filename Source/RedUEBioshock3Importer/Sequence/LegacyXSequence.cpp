@@ -11,11 +11,6 @@
 #include "Tracks/MovieSceneAudioTrack.h"
 
 
-FName ULegacyXSeqVar_PlayerController::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
-{
-	return GET_MEMBER_NAME_CHECKED(ALegacyKismet,PlayerController);
-}
-
 FName ULegacyXSeqVar_Elizabeth::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGraph* InGraph)
 {
 	return GET_MEMBER_NAME_CHECKED(ABioshockKismet,ElizabethPawn);

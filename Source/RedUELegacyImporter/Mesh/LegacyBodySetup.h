@@ -118,3 +118,11 @@ class REDUELEGACYIMPORTER_API ULegacyRB_BodySetup : public ULegacyKMeshProps
 public:
 	void PushTo(UBodySetup* ToBodySetup);
 };
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacyRB_ConstraintInstance : public ULegacyObject
+{
+	GENERATED_BODY()
+public:
+	void PushTo(UBodySetup* ToBodySetup);
+};

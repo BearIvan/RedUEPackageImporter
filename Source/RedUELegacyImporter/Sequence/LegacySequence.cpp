@@ -2,14 +2,14 @@
 #include "LegacySequence.h"
 
 #include "BlueprintCompilationManager.h"
+#include "BlueprintEditorLibrary.h"
 #include "K2Node_Composite.h"
 #include "ObjectTools.h"
 #include "PackageTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
-#include "Blueprint/Kismet/LegacyKismetBlueprint.h"
 #include "Core/LegacyPackage.h"
+#include "Engine/LevelScriptBlueprint.h"
 #include "Kismet/Base/LegacyKismet.h"
-#include "Kismet/Base/LegacyKismetGeneratedClass.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 
@@ -19,90 +19,44 @@ UObject* ULegacySequence::ImportKismet(bool Reimport)
 	{
 		return PresentObject;
 	}
-	auto ReCreateObject = [Reimport](const FString& Path,UBlueprint*&OutNewObject,UClass* ParentClass)
-	{
-		UObject* ExistingAsset = nullptr;
-		
-		UPackage* InParent = CreatePackage(*Path);
-		FName InName = *FPaths::GetBaseFilename(Path);
-		// create an asset if it doesn't exist
-		ExistingAsset = StaticFindObject(nullptr, InParent, *InName.ToString());
-		if (!Reimport)
-		{
-			OutNewObject = Cast<UBlueprint>(ExistingAsset);
-			return false;
-		}
-		if (!ExistingAsset)
-		{
-			OutNewObject = FKismetEditorUtilities::CreateBlueprint(ParentClass, InParent,  * FPaths::GetBaseFilename(*Path), BPTYPE_Normal, ULegacyKismetBlueprint::StaticClass(), ULegacyKismetGeneratedClass::StaticClass(), NAME_None);
-			ensure(OutNewObject);
-			return true;
-		}
-		
-		// otherwise delete and replace
-		if ( ObjectTools::ForceDeleteObjects({ExistingAsset},false) != 1)
-		{
-			UE_LOG(LogRedUELegacy, Warning, TEXT("Could not delete existing asset %s"), *ExistingAsset->GetFullName());
-			OutNewObject = nullptr;
-			return false;
-		}
-
-		InParent = CreatePackage(*Path);
-		// try to find the existing asset again now that the GC has occurred
-		ExistingAsset = StaticFindObject(nullptr, InParent, *InName.ToString());
-
-		// if the object is still around after GC, fail this operation
-		if (ExistingAsset)
-		{
-			OutNewObject = nullptr;
-			return false;
-		}
-		InParent = CreatePackage(*Path);
-		// create the asset in the package
-		OutNewObject = FKismetEditorUtilities::CreateBlueprint(ParentClass, InParent,  * FPaths::GetBaseFilename(*Path), BPTYPE_Normal, ULegacyKismetBlueprint::StaticClass(), ULegacyKismetGeneratedClass::StaticClass(), NAME_None);
-		ensure(OutNewObject);
-		return true;
-
-	};
 	
-	const FString Name = FPaths::GetBaseFilename( LegacyPackage->FileName)/GetLegacyName();
-	const FString ObjectPath = GetOutContentPath() / Name.Replace(TEXT("."),TEXT("/"));
-
-	UBlueprint*ResultBlueprint = nullptr;
 	UClass* KismetClass = ALegacyKismet::StaticClass();
 	if (LegacyPackage->GameType == ERedUELegacyGameType::Bioshock3)
 	{
 		KismetClass = ABioshockKismet::StaticClass(); 
 	}
-	if(ReCreateObject(ObjectPath,ResultBlueprint,KismetClass))
+	ULevelScriptBlueprint* LevelScriptBlueprint = GWorld->GetCurrentLevel()->GetLevelScriptBlueprint(false);
+	UBlueprintEditorLibrary::ReparentBlueprint(LevelScriptBlueprint,KismetClass);
+	
+	FString GraphName = GetLegacyName()+TEXT("_Graph");
+	if( ULevelScriptBlueprint* LegacyKismetBlueprint = CastChecked<ULevelScriptBlueprint>(LevelScriptBlueprint))
 	{
-		ULegacyKismetBlueprint* LegacyKismetBlueprint = CastChecked<ULegacyKismetBlueprint>(ResultBlueprint);
 		LegacyKismetBlueprint->PreEditChange(nullptr);
-		if (UEdGraph* EventGraph = FindObject<UEdGraph>(LegacyKismetBlueprint, *UEdGraphSchema_K2::GN_EventGraph.ToString()))
+		if (UEdGraph* EventGraph = FindObject<UEdGraph>(LegacyKismetBlueprint, GraphName))
 		{
-			GenerateBlueprint(LegacyKismetBlueprint,EventGraph);
+			FBlueprintEditorUtils::RemoveGraph(LegacyKismetBlueprint,EventGraph);
+		}
+		
+		
+		if (UEdGraph* NewGraph = FBlueprintEditorUtils::CreateNewGraph(LegacyKismetBlueprint,*GraphName, UEdGraph::StaticClass(), UEdGraphSchema_K2::StaticClass()))
+		{
+			FBlueprintEditorUtils::AddUbergraphPage(LegacyKismetBlueprint, NewGraph);
+		
+			GenerateBlueprint(LegacyKismetBlueprint,NewGraph);
 			FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(LegacyKismetBlueprint);
 		}
+		
 		FKismetEditorUtilities::GenerateBlueprintSkeleton(LegacyKismetBlueprint, true);
 		LegacyKismetBlueprint->Modify();
 		LegacyKismetBlueprint->PostEditChange();
 		FBlueprintCompilationManager::CompileSynchronously(FBPCompileRequest(LegacyKismetBlueprint, EBlueprintCompileOptions::SkeletonUpToDate, nullptr));
 		FAssetRegistryModule::AssetCreated(LegacyKismetBlueprint);
 		
-		PresentObject = LegacyKismetBlueprint;
+		PresentObject = nullptr;
 	}
-	else if (ResultBlueprint)
-	{
-		for(ULegacySequenceObject* SequenceObject : SequenceObjects)
-		{
-			if(ULegacySequenceOp* SequenceEvent = Cast<ULegacySequenceOp>(SequenceObject))
-			{
-				SequenceEvent->SimulatedImport();
-			}
-		}
-		
-		PresentObject = ResultBlueprint;
-	}
+	
+	FillActor(GetMutableDefault<ALegacyKismet>(LevelScriptBlueprint->GeneratedClass));
+	
 	return PresentObject;
 }
 

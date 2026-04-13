@@ -1,8 +1,13 @@
 ﻿#include "Core\LegacyPackage.h"
 
 #include "Editor.h"
+#include "LegacyTypeInfo.h"
 #include "RedUELegacyArchiveFileHandle.h"
+#include "RedUELegacyImporterSettings.h"
 #include "Core/RedUELegacySubsystem.h"
+#include "Kismet/Base/SequenceAction.h"
+#include "Sequence/LegacySequenceObjects.h"
+#include "World/LegacyWorld.h"
 
 FRedUELegacyPackageFileSummary::FRedUELegacyPackageFileSummary()
 {
@@ -519,6 +524,7 @@ bool ULegacyPackage::LoadPackage(const TCHAR* InFileName)
     LoadImportTable();
     LoadExportTable();
     bIsLoaded = true;
+	PostLoadPackage();
 	return true;
 }
 
@@ -549,7 +555,7 @@ FArchive& ULegacyPackage::operator<<(FName& Value)
         }
         else
         {
-            Value = *FString::Printf(TEXT("%s%d"),*NameTable[N_Index],N_ExtraIndex-1);
+            Value = FName(FName(NameTable[N_Index]),N_ExtraIndex);
         }
         return *this;
     }
@@ -575,7 +581,7 @@ FArchive& ULegacyPackage::operator<<(FName& Value)
     }
     else
     {
-        Value = *FString::Printf(TEXT("%s%d"),*NameTable[N_Index],N_ExtraIndex-1);
+        Value = FName(FName(NameTable[N_Index]),N_ExtraIndex);
     }
 	return *this;
 }
@@ -599,6 +605,13 @@ FArchive& ULegacyPackage::operator<<(UObject*& Value)
         //		appPrintf("PKG: Export[%d] OBJ=%s CLS=%s\n", index, *Exp.ObjectName, GetClassNameFor(Exp));
         Value = GetOrCreateExport(Index-1);
     }
+	if (Value)
+	{
+		if (Value->IsA<ULegacyUnknown>())
+		{
+			Value = nullptr;
+		}
+	}
     return *this;
 }
 
@@ -647,6 +660,110 @@ void ULegacyPackage::PopStopper()
     Stopper = StoppersSaved.Pop();
 }
 
+void ULegacyPackage::LegacySerialize(FRedUELegacyArchive& Ar)
+{
+	
+}
+
+UObject* ULegacyPackage::ExportToContent()
+{
+	for (ULegacyObject*Object:Objects)
+	{
+		if (Object)
+		{
+			Object->ExportToContent();
+		}
+	}
+	return nullptr;
+}
+
+UClass* ULegacyPackage::FindNearestClass(int32 Index)
+{
+	if (Index == 0)
+	{
+		return ULegacyClass::StaticClass();
+	}
+	
+	FName PackageName = GetPackageName(Index);
+	FName ObjectName = GetObjectName(Index);
+	URedUELegacySubsystem*RedUELegacySubsystem =  GetTypedOuter<URedUELegacySubsystem>();
+	if (FRedUELegacyVirtualPackage* VirtualPackage = RedUELegacySubsystem->VirtualPackages.Find(PackageName))
+	{
+		if (TSubclassOf<ULegacyObject>* FoundClass = VirtualPackage->Classes.Find(ObjectName))
+		{
+			return FoundClass->Get();
+		}
+	}
+	
+	ULegacyClass* LegacyClass;
+	if (Index < 0)
+	{
+		LegacyClass = CastChecked<ULegacyClass>(GetOrCreateImport(-Index - 1),ECastCheckedType::NullAllowed);
+	}
+	else
+	{
+		LegacyClass = CastChecked<ULegacyClass>(GetOrCreateExport(Index - 1),ECastCheckedType::NullAllowed);
+	}
+	check(LegacyClass);
+	RedUELegacySubsystem->ObjectPreload(LegacyClass);
+	return FindNearestClass(LegacyClass);
+}
+
+UClass* ULegacyPackage::FindNearestClass(ULegacyClass* LegacyClass)
+{
+	URedUELegacySubsystem*RedUELegacySubsystem =  GetTypedOuter<URedUELegacySubsystem>();
+	FName ClassName = LegacyClass->GetLegacyFName();
+	
+	if (TSubclassOf<ULegacyObject>* InClass = RedUELegacySubsystem->Classes.Find(ClassName))
+	{
+		return InClass->Get();
+	}
+	
+	while (const FName* SubClass = GetDefault<URedUELegacyImporterSettings>()->EmptyClasses.Find(ClassName))
+	{
+		ClassName = *SubClass;
+	}
+	
+	if (TSubclassOf<ULegacyObject>* InClass = RedUELegacySubsystem->Classes.Find(ClassName))
+	{
+		return InClass->Get();
+	}
+	
+	if(!RedUELegacySubsystem->CacheNoFoundClasses.Contains(ClassName))
+	{
+		RedUELegacySubsystem->CacheNoFoundClasses.Add(ClassName);
+		FMessageLog RedUELegacyMessageLog("RedUELegacy");
+		RedUELegacyMessageLog.Error(FText::FromString(FString::Printf(TEXT("Can't found class %s"),*ClassName.ToString())));
+		RedUELegacyMessageLog.Open(EMessageSeverity::Error);
+	}
+	
+	ULegacyClass* SuperClass = CastChecked<ULegacyClass>(LegacyClass->SuperField);
+	RedUELegacySubsystem->ObjectPreload(SuperClass);
+	FName SuperClassName = SuperClass->GetLegacyFName();
+	UClass* Result = FindNearestClass(SuperClass);
+	for (TSoftClassPtr<ULegacyObject> IgnoreClass : GetDefault<URedUELegacyImporterSettings>()->IgnoredClassesForAutoMakeEmptyClass)
+	{
+		if (UClass* SomeBase = IgnoreClass.Get())
+		{
+			if (Result->IsChildOf(SomeBase))
+			{
+				return nullptr;
+			}
+		}
+		
+	}
+	if (GetDefault<URedUELegacyImporterSettings>()->bAutoMakeEmptyClass && Result)
+	{
+		URedUELegacyImporterSettings* RedUELegacyImporterSettings  = GetMutableDefault<URedUELegacyImporterSettings>();
+		RedUELegacyImporterSettings->PreEditChange(nullptr);
+		RedUELegacyImporterSettings->EmptyClasses.Add(ClassName,SuperClassName);
+		RedUELegacyImporterSettings->PostEditChange();
+		RedUELegacyImporterSettings->TryUpdateDefaultConfigFile();
+	}
+    	
+	return Result;
+}
+
 ULegacyObject* ULegacyPackage::GetOrCreateImport(int32 Index)
 {
 	auto CompareObjectPaths = [](ULegacyPackage* Package,int32 PackageIndex, ULegacyPackage *RefPackage, int32 RefPackageIndex)
@@ -689,8 +806,16 @@ ULegacyObject* ULegacyPackage::GetOrCreateImport(int32 Index)
 			{
 				RefPackageName = *FPaths::GetBaseFilename(RefPackage->FileName);
 			}
-			
-			if (RefPackageName != PackageName)
+			if (PackageName.ToString() == TEXT("snd_vo_SP_WL_wav"))
+			{
+				__nop();
+			}
+			if (RefPackageName.ToString() == TEXT("snd_vo_SP_WL_wav"))
+			{
+				__nop();
+			}
+			FString LocRefPackageName = RefPackageName.ToString() + TEXT("_") + GetDefault<URedUELegacyImporterSettings>()->Language.ToUpper();
+			if (RefPackageName != PackageName && LocRefPackageName != PackageName.ToString())
 			{
 				return false;
 			}
@@ -721,7 +846,7 @@ ULegacyObject* ULegacyPackage::GetOrCreateImport(int32 Index)
 			if (ObjIndex == INDEX_NONE)
 				break;
 			
-			if (CompareObjectPaths(Package,ObjIndex+1, this, -1-Index))
+			if (CompareObjectPaths(Package,ObjIndex + 1, this, -1-Index))
 				return ObjIndex;	
 		}
 
@@ -791,28 +916,101 @@ ULegacyObject* ULegacyPackage::GetOrCreateExport(int32 Index)
     }
 
     URedUELegacySubsystem*RedUELegacySubsystem =  GetTypedOuter<URedUELegacySubsystem>();
-    const FName ClassName = GetObjectName(Exp.ClassIndex);
-
 	
-    Exp.Object = RedUELegacySubsystem->CreateObject(*GetFullExportName(Index),ClassName,this);
+	ULegacyObject* SuperObject = nullptr;
+	if (Exp.SuperIndex != 0)
+	{
+		if (Exp.SuperIndex < 0)
+		{
+			SuperObject = GetOrCreateImport(-Exp.SuperIndex-1);
+		}
+		else if (Exp.ClassIndex > 0)
+		{
+			SuperObject = GetOrCreateExport(Exp.SuperIndex-1);
+		}
+		RedUELegacySubsystem->ObjectPreload(SuperObject);
+	}
+	if (!SuperObject && Exp.PackageIndex != 0)
+	{
+		if (Exp.PackageIndex < 0)
+		{
+			SuperObject = GetOrCreateImport(-Exp.PackageIndex-1);
+		}
+		else if (Exp.PackageIndex > 0)
+		{
+			SuperObject = GetOrCreateExport(Exp.PackageIndex-1);
+		}
+		RedUELegacySubsystem->ObjectPreload(SuperObject);
+	}
+	else
+	{
+		SuperObject = this;
+	}
+	
+	EObjectFlags OutObjectFlags = RF_NoFlags;
+	uint64 InObjectFlags = Exp.ObjectFlags | static_cast<uint64>(Exp.ObjectFlags2) << 32ull;
+	if (InObjectFlags & RLF_ClassDefaultObject || InObjectFlags & RLF_ArchetypeObject)
+	{
+		OutObjectFlags |= RF_ArchetypeObject;
+		if (SuperObject && SuperObject->HasAnyFlags(RF_DefaultSubObject | RF_ArchetypeObject))
+		{
+			OutObjectFlags |= RF_DefaultSubObject;
+		}
+	}
+	
+	const FName ClassName = GetObjectName(Exp.ClassIndex);
+	if (RedUELegacySubsystem->SequenceActionClasses.Contains(ClassName) && !RedUELegacySubsystem->Classes.Contains(ClassName))
+	{
+		ULegacySequenceImporter* SequenceImporter = NewObject<ULegacySequenceImporter>(SuperObject,ULegacySequenceImporter::StaticClass(),Exp.ObjectName,OutObjectFlags);
+		if (ensure(SequenceImporter))
+		{
+			static FName  NAME_Action = "Action";
+			SequenceImporter->ToAction = NewObject<USequenceAction>(SequenceImporter,RedUELegacySubsystem->SequenceActionClasses[ClassName],NAME_Action, OutObjectFlags|RF_DefaultSubObject);
+			Exp.Object = SequenceImporter;
+		}
+	}
+	else
+	{
+		if (UClass* Class = FindNearestClass(Exp.ClassIndex))
+		{
+			Exp.Object = NewObject<ULegacyObject>(SuperObject,Class,Exp.ObjectName,OutObjectFlags);
+		}
+	}
 
-    if(!Exp.Object)
+	if(!Exp.Object)
     {
-    	if(!RedUELegacySubsystem->CacheNoFoundClasses.Contains(ClassName))
+    	Exp.Object = NewObject<ULegacyUnknown>(SuperObject, Exp.ObjectName, OutObjectFlags);
+    }
+	
+	if (ULegacyPackage* SuperPackage = Cast<ULegacyPackage>(SuperObject))
+	{
+		SuperPackage->Objects.Add(Exp.Object);
+	}
+    {
+    	ULegacyObject* ClassObject = nullptr;
+    	if (Exp.ClassIndex != 0)
     	{
-    		RedUELegacySubsystem->CacheNoFoundClasses.Add(ClassName);
-    		FMessageLog RedUELegacyMessageLog("RedUELegacy");
-    		RedUELegacyMessageLog.Error(FText::FromString(FString::Printf(TEXT("Can't found class %s"),*ClassName.ToString())));
-    		RedUELegacyMessageLog.Open(EMessageSeverity::Error);
+    		if (Exp.ClassIndex < 0)
+    		{
+    			ClassObject = GetOrCreateImport(-Exp.ClassIndex-1);
+    		}
+    		else if (Exp.ClassIndex > 0)
+    		{
+    			ClassObject = GetOrCreateExport(Exp.ClassIndex-1);
+    		}
+    		RedUELegacySubsystem->ObjectPreload(ClassObject);
     	}
-    	
-        return nullptr;
+    	if (ULegacyClass* LegacyClass = Cast<ULegacyClass>(ClassObject); LegacyClass && LegacyClass->ClassDefaultObject)
+    	{
+    		UEngine::FCopyPropertiesForUnrelatedObjectsParams Options;
+    		Options.bDoDelta = false;
+    		UEngine::CopyPropertiesForUnrelatedObjects(LegacyClass->ClassDefaultObject, Exp.Object, Options);
+    	}
     }
     {
     	ULegacyObject* Template = nullptr;
     	if (Exp.Archetype != 0)
     	{
-		
     		if (Exp.Archetype < 0)
     		{
     			Template = GetOrCreateImport(-Exp.Archetype-1);
@@ -826,36 +1024,15 @@ ULegacyObject* ULegacyPackage::GetOrCreateExport(int32 Index)
     	if (Template)
     	{
     		UEngine::FCopyPropertiesForUnrelatedObjectsParams Options;
+    		Options.bDoDelta = false;
     		UEngine::CopyPropertiesForUnrelatedObjects(Template, Exp.Object, Options);
     	}
     }
 	
     RedUELegacySubsystem->ObjectsBeginLoad();
-    ULegacyObject *CurrentOuter = nullptr;
-    if (Exp.PackageIndex)
-    {
-        const FRedUELegacyObjectExport &OuterExp = GetExport(Exp.PackageIndex - 1);
-        CurrentOuter = OuterExp.Object;
-        if (!CurrentOuter)
-        {
-            FName OuterClassName = GetObjectName(OuterExp.ClassIndex);
-        	if (OuterClassName != NAME_Package)
-        	{
-        		if (ensure(RedUELegacySubsystem->IsKnownClass(OuterClassName)))
-        		{
-        			CurrentOuter = GetOrCreateExport(Exp.PackageIndex - 1);
-        			ensure(CurrentOuter);
-        		}
-        	}
-        }
-    }
-    if(CurrentOuter)
-    {
-        ensure(Exp.Object->Rename(*Exp.ObjectName.ToString(),CurrentOuter));
-    }
     Exp.Object->LegacyPackage = this;
     Exp.Object->LegacyPackageIndex = Index;
-    Exp.Object->LegacyObjectFlags = Exp.ObjectFlags | static_cast<uint64>(Exp.ObjectFlags2) << 32ull;
+    Exp.Object->LegacyObjectFlags = InObjectFlags;
 	Exp.Object->LegacyObjectFlags |= RLF_NeedLoad;
     RedUELegacySubsystem->ObjectsLoaded.Add(Exp.Object);
     RedUELegacySubsystem->ObjectsEndLoad();
@@ -995,6 +1172,10 @@ void ULegacyPackage::BeginDestroy()
 	    ClosePackage();
 	}
     Super::BeginDestroy();
+}
+
+void ULegacyPackage::PostLoadPackage()
+{
 }
 
 

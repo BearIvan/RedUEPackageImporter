@@ -1,7 +1,10 @@
 ﻿#include "World/LegacyLevel.h"
+
+#include "BlueprintEditorLibrary.h"
 #include "Editor.h"
 #include "Core/RedUELegacyArchive.h"
 #include "Core/RedUELegacySubsystem.h"
+#include "Engine/LevelScriptBlueprint.h"
 #include "Entities/LegacyActor.h"
 #include "Kismet/Base/LegacyKismet.h"
 #include "Mesh/LegacyModel.h"
@@ -56,15 +59,11 @@ void ULegacyLevel::ImportLevel(bool ReimportKismet)
             }
         }
     }
-    ALevelScriptActor* LevelScriptActor =  GWorld->GetLevelScriptActor();
-    ULevelScriptBlueprint* LevelScriptBlueprint = GWorld->PersistentLevel->GetLevelScriptBlueprint(false);
+    
+    
     for(ULegacySequence* Sequence: GameSequences)
     {
-        if (UBlueprint* KismetBlueprint = CastChecked<UBlueprint>(Sequence->ImportKismet(ReimportKismet),ECastCheckedType::NullAllowed))
-        {
-            ALegacyKismet*LevelKismet = GWorld->SpawnActor<ALegacyKismet>(KismetBlueprint->GeneratedClass);
-            Sequence->FillActor(LevelKismet);
-        }
+        Sequence->ImportKismet(true);
     }
     if (Model)
     {

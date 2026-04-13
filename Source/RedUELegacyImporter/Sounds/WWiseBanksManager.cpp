@@ -271,9 +271,6 @@ USoundBase* FWWiseBankObjectEvent::ExportToContent()
     	}
     	SoundCue->PostEditChange();
     	SoundCue->Modify();
-    	
-    	
-        
     }
 	
 

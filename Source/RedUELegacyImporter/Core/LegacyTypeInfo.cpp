@@ -5,7 +5,7 @@
 void ULegacyField::LegacySerialize(FRedUELegacyArchive& Ar)
 {
     Super::LegacySerialize(Ar);
-    if (Ar.LegacyVer < 756)
+    if (Ar.LegacyVer < 756 && Ar.Game != ERedUELegacyGame::Bioshock3)
         Ar << SuperField2;
     Ar << Next;
 }
@@ -38,7 +38,8 @@ void ULegacyTextBuffer::LegacySerialize(FRedUELegacyArchive& Ar)
 void ULegacyStruct::LegacySerialize(FRedUELegacyArchive& Ar)
 {
     Super::LegacySerialize(Ar);
-    if (Ar.LegacyVer >= 756)
+    
+    if (Ar.LegacyVer >= 756 || Ar.Game == ERedUELegacyGame::Bioshock3)
     {
         Ar << SuperField;
     }
@@ -46,10 +47,24 @@ void ULegacyStruct::LegacySerialize(FRedUELegacyArchive& Ar)
     {
         SuperField = SuperField2;
     }
+    
+    Ar << ScriptText;
+    Ar << Children;
+    Ar << CppText;
+    
     Ar << Line << TextPos;
-    int ScriptSize;
+    int32 ScriptSize;
     Ar << ScriptSize;
-    if (ScriptSize)
+    if (Ar.LegacyVer >= 639)
+    {
+        int32 ScriptStorageSize;
+        Ar << ScriptStorageSize;
+        Script.Empty( ScriptStorageSize );
+        Script.Add( ScriptStorageSize );
+        Ar.Serialize(&Script[0], ScriptStorageSize);
+
+    }
+    else  if (ScriptSize)
     {
         int remaining = Ar.GetStopper() - Ar.Tell();
         UE_LOG(LogRedUELegacy,Log,TEXT("script: %d, rest: %d\n"), ScriptSize, remaining);
@@ -73,13 +88,81 @@ void ULegacyScriptStruct::LegacySerialize(FRedUELegacyArchive& Ar)
 void ULegacyState::LegacySerialize(FRedUELegacyArchive& Ar)
 {
     Super::LegacySerialize(Ar);
-    Ar << ProbeMask << IgnoreMask << StateFlags << LabelTableOffset;
+    if (Ar.Game == ERedUELegacyGame::Singularity)
+    {
+        Ar << ProbeMask;
+        Ar << IgnoreMask;
+    }
+    else
+    {
+        int32 ProbeMask32 = ProbeMask;
+        Ar << ProbeMask32;
+        ProbeMask = ProbeMask32;
+    }
+    Ar << LabelTableOffset << StateFlags;
+    Ar << FuncMap;
+}
+
+FArchive& operator<<(FArchive& Ar, FLegacyImplementedInterface& R)
+{
+    Ar << R.Class << R.PointerProperty;
+    return Ar;
 }
 
 void ULegacyClass::LegacySerialize(FRedUELegacyArchive& Ar)
 {
     Super::LegacySerialize(Ar);
-    Ar.Seek(Ar.GetStopper());
+    
+    Ar << ClassFlags;
+    Ar << ClassWithin << ClassConfigName;
+    Ar << ComponentNameToDefaultObjectMap;
+    Ar << Interfaces;
+    
+    {
+        if( Ar.LegacyVer >= 603 )
+        {
+            Ar << DontSortCategories;
+        }
+        
+        Ar << HideCategories << AutoExpandCategories << AutoCollapseCategories;
+        
+        if( Ar.LegacyVer  >= 749 )
+        {
+            Ar << bForceScriptOrder;
+        }
+        else
+        {
+            bForceScriptOrder = 0;
+        }
+
+        if( Ar.LegacyVer >= 789 )
+        {
+            Ar << ClassGroupNames;
+        }
+        if (Ar.Game != ERedUELegacyGame::Bioshock3 && Ar.Game != ERedUELegacyGame::Singularity)
+        {
+            Ar << ClassHeaderFilename;
+        }
+    }
+    
+    if( Ar.LegacyVer >= 655 )
+    {
+        FName Dummy = NAME_None;
+        Ar << Dummy;
+    }
+    if (Ar.Game == ERedUELegacyGame::Singularity)
+    {
+        TArray<FName> Unknown2;
+        Ar << Unknown2;
+        int32 Unknown3;
+        Ar << Unknown3;
+    }
+    Ar << ClassDefaultObject;
+    if (ClassDefaultObject)
+    {
+        ClassDefaultObject->Rename(nullptr, this);
+    }
+    
 }
 
 void ULegacyProperty::LegacySerialize(FRedUELegacyArchive& Ar)

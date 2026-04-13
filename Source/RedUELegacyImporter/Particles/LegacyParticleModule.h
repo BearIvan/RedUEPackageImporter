@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "Core/LegacyDistributionVector.h"
 #include "Core/LegacyObject.h"
 #include "Particles/ParticleSpriteEmitter.h"
 #include "Particles/Orbit/ParticleModuleOrbit.h"
@@ -9,33 +10,6 @@
 
 
 USTRUCT()
-struct FLegacyRawDistribution
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(meta = (LegacyRead))
-	uint8 Type = 0;
-	
-	UPROPERTY(meta = (LegacyRead))
-	uint8 Op = 0;
-	
-	UPROPERTY(meta = (LegacyRead))
-	uint8 LookupTableNumElements = 0;
-	
-	UPROPERTY(meta = (LegacyRead))
-	uint8 LookupTableChunkSize = 0;
-	
-	UPROPERTY(meta = (LegacyRead))
-	TArray<float> LookupTable;
-	
-	UPROPERTY(meta = (LegacyRead))
-	float LookupTableTimeScale = 0;
-	
-	UPROPERTY(meta = (LegacyRead))
-	float LookupTableStartTime = 0;
-};
-
-USTRUCT()
 struct FLegacyRawDistributionFloat:public FLegacyRawDistribution
 {
 	GENERATED_BODY()
@@ -43,16 +17,7 @@ public:
 	UDistributionFloat* MakeDistributionFloat(UObject*Outer) const;
 };
 
-USTRUCT()
-struct FLegacyRawDistributionVector:public FLegacyRawDistribution
-{
-	GENERATED_BODY()
-public:
-	UPROPERTY(meta = (LegacyRead))
-	ULegacyObject* Distribution;
-	
-	UDistributionVector* MakeDistributionVector(UObject*Outer) const;
-};
+
 
 UCLASS()
 class REDUELEGACYIMPORTER_API ULegacyDistributionVectorParticleParameter : public ULegacyObject

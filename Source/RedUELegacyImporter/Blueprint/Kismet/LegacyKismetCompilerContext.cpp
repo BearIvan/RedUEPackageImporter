@@ -1,53 +1,49 @@
 ﻿#include "LegacyKismetCompilerContext.h"
 
+#include "Kismet/Base/LegacyKismet.h"
 #include "Kismet/Base/SequenceAction.h"
-#include "Kismet2/KismetReinstanceUtilities.h"
 
-void FLegacyKismetCompilerContext::CreateFunctionList()
+
+
+void FLegacyKismetCompilerContext::CopyTermDefaultsToDefaultObject(UObject* DefaultObject)
 {
-    ensure(Actions.IsEmpty());
-    FKismetCompilerContext::CreateFunctionList();
+    FKismetCompilerContext::CopyTermDefaultsToDefaultObject(DefaultObject);
     
-}
-
-void FLegacyKismetCompilerContext::FinishCompilingClass(UClass* Class)
-{
-    FKismetCompilerContext::FinishCompilingClass(Class);
-
-    if (!ensure(NewKismetGeneratedClass))
+    ALegacyKismet* LegacyKismetCDO = Cast<ALegacyKismet>(DefaultObject);
+    if (!LegacyKismetCDO)
     {
         return;
     }
-    
-    for (UK2Node_SequenceAction* SequenceAction:Actions)
+
+    LegacyKismetCDO->SequenceActions.Empty();
+
+    TArray<UK2Node_SequenceAction*> Actions;
+
+    TArray<UEdGraph*> AllGraphs;
+    Blueprint->GetAllGraphs(AllGraphs);
+    for (UEdGraph* Graph : AllGraphs)
     {
-        if (USequenceAction* Template = SequenceAction->Action)
+        if (Graph)
         {
-            NewKismetGeneratedClass->StartupActions.Add(SequenceAction->NodeGuid,NewObject<USequenceAction>(NewKismetGeneratedClass,Template->GetClass(),NAME_None,RF_NoFlags,Template));
+            Graph->GetNodesOfClass(Actions);
         }
     }
-    
-    Actions.Empty();
-}
 
-void FLegacyKismetCompilerContext::OnNewClassSet(UBlueprintGeneratedClass* ClassToUse)
-{
-    FKismetCompilerContext::OnNewClassSet(ClassToUse);
-	NewKismetGeneratedClass = Cast<ULegacyKismetGeneratedClass>(ClassToUse);
-}
-
-void FLegacyKismetCompilerContext::SpawnNewClass(const FString& NewClassName)
-{
-    NewKismetGeneratedClass = FindObject<ULegacyKismetGeneratedClass>(Blueprint->GetOutermost(), *NewClassName);
-
-    if ( NewKismetGeneratedClass == NULL )
+    for (UK2Node_SequenceAction* SequenceAction : Actions)
     {
-        NewKismetGeneratedClass = NewObject<ULegacyKismetGeneratedClass>(Blueprint->GetOutermost(), FName(*NewClassName), RF_Public | RF_Transactional);
+        if (!SequenceAction)
+        {
+            continue;
+        }
+
+        if (USequenceAction* Template = SequenceAction->Action)
+        {
+            USequenceAction* NewStartupAction = NewObject<USequenceAction>(
+                LegacyKismetCDO, Template->GetClass(), NAME_None, RF_DefaultSubObject, Template);
+            SequenceAction->FillAction(NewStartupAction, *this);
+            LegacyKismetCDO->SequenceActions.Add(
+                SequenceAction->NodeGuid,
+                NewStartupAction);
+        }
     }
-    else
-    {
-        // Already existed, but wasn't linked in the Blueprint yet due to load ordering issues
-        FBlueprintCompileReinstancer::Create(NewKismetGeneratedClass);
-    }
-    NewClass = NewKismetGeneratedClass;
 }

@@ -13,6 +13,28 @@ class ULegacyWorld;
 /**
  * 
  */
+USTRUCT()
+struct FRedUELegacyVirtualPackage
+{
+	GENERATED_BODY()
+	
+	UPROPERTY()
+	TMap<FName,TSubclassOf<ULegacyObject>> Classes;
+};
+
+USTRUCT()
+struct FRedUELegacyExportPostLoad
+{
+	GENERATED_BODY()
+	
+	UPROPERTY()
+	ULegacyObject* From;
+	
+	void* To;
+	FObjectProperty* ObjectProperty;
+	int32 ArrayIndex = 0;
+};
+
 UCLASS(Transient,BlueprintType)
 class REDUELEGACYIMPORTER_API URedUELegacySubsystem : public UEditorSubsystem
 {
@@ -25,7 +47,7 @@ public:
     void            ObjectsEndLoad          ();
     void            RefreshClasses          (ERedUELegacyEngineType CurrentEngineType, ERedUELegacyGameType CurrentGameType);
     void            Initialize				(ERedUELegacyEngineType CurrentEngineType, ERedUELegacyGameType CurrentGameType);
-    ULegacyObject*  CreateObject            (FName ObjectName,FName ClassName, ULegacyPackage*FromPackage);
+    ULegacyObject*  CreateObject            (FName ObjectName,FName ClassName, ULegacyPackage*FromPackage,UObject* Outer = nullptr, EObjectFlags ObjectFlags = RF_Public);
     bool            IsKnownClass            (FName ClassName);
 	UCurveFloat*	GetBrightnessToEVCurve	();
     int32           ObjectsBeginLoadCount = 0;
@@ -49,10 +71,13 @@ public:
     TMap<FString,ULegacyPackage*> Packages;
     
     UPROPERTY(Transient)
-    TArray<ULegacyObject*> ObjectsLoaded;
+	TArray<ULegacyObject*> ObjectsLoaded;
 	
     UPROPERTY(Transient)
     TMap<FName,TSubclassOf<ULegacyObject>> Classes;
+	
+	UPROPERTY(Transient)
+	TMap<FName,FRedUELegacyVirtualPackage> VirtualPackages;
 	
 	UPROPERTY(Transient)
 	TMap<FName,TSubclassOf<class USequenceAction>> SequenceActionClasses;
@@ -65,6 +90,9 @@ public:
 	
 	UPROPERTY(Transient,BlueprintReadWrite)
 	TArray<FString> InContentPaths;
+	
+	UPROPERTY(Transient,BlueprintReadWrite)
+	TArray<FString> OptionalContentPaths;
 	
 	UPROPERTY(Transient,BlueprintReadWrite)
 	FString OutContentPath;
@@ -80,6 +108,9 @@ public:
 	
 	UPROPERTY(Transient)
 	ULegacyXWorldFloatingSectionIndexTable* FloatingSectionIndexTable = nullptr;
+	
+	UPROPERTY(Transient)
+	TArray<FRedUELegacyExportPostLoad> ExportsPostLoad;
 	
     ERedUELegacyGameType CurrentGameType = ERedUELegacyGameType::Unkown;
     ERedUELegacyEngineType CurrentEngineType = ERedUELegacyEngineType::Unkown;

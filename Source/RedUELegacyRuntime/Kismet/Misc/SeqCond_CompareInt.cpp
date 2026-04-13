@@ -30,3 +30,9 @@ void USeqCond_CompareInt::In()
 		OutE.Broadcast();
 	}
 }
+
+void USeqCond_Increment::In()
+{
+	SetValueA(GetValueA() + IncrementAmount);
+	Super::In();
+}

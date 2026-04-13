@@ -3,7 +3,14 @@
 #include "LegacyStaticMeshActor.generated.h"
 
 UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyStaticMeshActor : public ULegacyActor
+class REDUELEGACYIMPORTER_API ULegacyStaticMeshActorBase : public ULegacyActor
+{
+    GENERATED_BODY()
+public:
+};
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacyStaticMeshActor : public ULegacyStaticMeshActorBase
 {
     GENERATED_BODY()
 public:
@@ -12,5 +19,4 @@ public:
 
     UPROPERTY(BlueprintReadWrite)
     class ULegacyStaticMeshComponent* StaticMeshComponent;
-
 };

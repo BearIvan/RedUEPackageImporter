@@ -72,18 +72,12 @@ UObject* ULegacyTexture2D::ExportToContent()
 	{
 		return PresentObject;
 	}
-	const FString ObjectPath = GetOutContentPath()/ GetLegacyFullName().Replace(TEXT("."),TEXT("/"));
-    const FString PackageName = UPackageTools::SanitizePackageName(ObjectPath);
-    const FString FullObjectPath = PackageName + TEXT(".") + FPaths::GetBaseFilename(PackageName);
-    UTexture2D* Texture2D = LoadObject<UTexture2D>(nullptr, *FullObjectPath,nullptr,LOAD_NoWarn);
-    if(!Texture2D)
-    {
+	
+	UTexture2D* Texture2D;
+	if(TryLoadOrCreate(Texture2D))
+	{
     	bool IsHDR = false;
-
-    	
-    	UPackage*  AssetPackage = CreatePackage(*PackageName);
-    	Texture2D = NewObject<UTexture2D>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
-    	Texture2D->PreEditChange(nullptr);
+		Texture2D->PreEditChange(nullptr);
     	FAssetRegistryModule::AssetCreated(Texture2D);
 
     	bool IsNormalMap = false;

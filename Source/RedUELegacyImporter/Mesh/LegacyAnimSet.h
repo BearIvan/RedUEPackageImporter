@@ -12,10 +12,16 @@ class REDUELEGACYIMPORTER_API ULegacyAnimSet : public ULegacyObject
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintCallable, Category = "Legacy|Editor",CallInEditor)
-	void ImportSequences	(USkeleton* Skeleton);
+	void ImportSequences(USkeleton* Skeleton);
+	
+	UFUNCTION(BlueprintCallable, Category = "Legacy|Editor",CallInEditor)
+	bool ContainsSequence( FName AnimName) const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Legacy|Editor",CallInEditor)
+	UAnimSequenceBase* FindOrImportSequence(USkeleton* Skeleton, FName AnimName);
 
 	UFUNCTION(BlueprintCallable, Category = "Legacy|Editor",CallInEditor)
-	void ReImportSequences	(USkeleton* Skeleton);
+	void ReImportSequences(USkeleton* Skeleton);
 	
 	UPROPERTY(BlueprintReadWrite)
 	bool bAnimRotationOnly;

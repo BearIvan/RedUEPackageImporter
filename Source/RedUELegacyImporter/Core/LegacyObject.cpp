@@ -1,4 +1,6 @@
 ﻿#include "LegacyObject.h"
+
+#include "PackageTools.h"
 #include "Core/LegacyPackage.h"
 #include "Core/LegacyTypeInfo.h"
 #include "Core/RedUELegacySubsystem.h"
@@ -73,6 +75,21 @@ void ULegacyObject::LegacyPostLoad()
 {
 }
 
+void ULegacyObject::LegacySerializeDefaultObject(FRedUELegacyArchive& Ar)
+{
+	if (Ar.LegacyVer >= 322)
+	{
+		Ar << NetIndex;
+	}
+    
+	if(GetClass()->IsChildOf<ULegacyClass>())
+	{
+		return;
+	}
+	
+	LegacySerializeUnrealProps(GetClass(),this,Ar);
+}
+
 struct FPushedState
 {
     class UObject* State;
@@ -88,10 +105,6 @@ struct FPushedState
 void ULegacyObject::LegacySerialize(FRedUELegacyArchive& Ar)
 {
 	constexpr int64 RF_HasStack = 0x0200000000000000ull;
-	 if (GetLegacyFullName() == TEXT("TheWorld.PersistentLevel.XWorldInfo6"))
-	 {
-	 	__nop();
-	 }
     if (LegacyObjectFlags&RF_HasStack && Ar.Game != ERedUELegacyGame::Bioshock3)
     {
         int32 Node;
@@ -125,6 +138,7 @@ void ULegacyObject::LegacySerialize(FRedUELegacyArchive& Ar)
             Ar << Offset;
         }
     }
+	
     if(IsAComponent())
     {
         LegacySerializeComponent(Ar);
@@ -139,14 +153,14 @@ void ULegacyObject::LegacySerialize(FRedUELegacyArchive& Ar)
     {
         return;
     }
+	PropertiesOffset = Ar.Tell();
 	PreLegacySerializeUnrealProps(Ar);
     LegacySerializeUnrealProps(GetClass(),this,Ar);
-    
 }
 
 void ULegacyObject::LegacySerializeComponent(FArchive& Ar)
 {
-	auto IsTemplate = [this]( int64 TemplateTypes = (0x400|0x200) ) 
+	auto IsTemplate = [this]( int64 TemplateTypes = (RLF_ArchetypeObject|RLF_ClassDefaultObject) ) 
 	{
 		for ( const ULegacyObject* TestOuter = this; TestOuter; TestOuter = Cast<ULegacyObject>( TestOuter->GetOuter()) )
 		{
@@ -162,7 +176,7 @@ void ULegacyObject::LegacySerializeComponent(FArchive& Ar)
 	Ar<<TemplateOwnerClass;
 
     
-	if (IsTemplate(0x200))
+	if (IsTemplate(RLF_ClassDefaultObject))
 	{
 		FName TemplateName;
 		Ar<<TemplateName;
@@ -479,6 +493,27 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
             {
                 UObject*InObject;
                 Ar<<InObject;
+            	
+            	if (ObjectProperty->PropertyClass &&
+							!ObjectProperty->PropertyClass->IsChildOf<ULegacyObject>() &&
+							ObjectProperty->PropertyClass != UObject::StaticClass() &&
+							InObject && InObject->IsA<ULegacyObject>())
+            	{
+            		if (ULegacyObject* LegacyObject = Cast<ULegacyObject>(InObject))
+            		{
+            			FRedUELegacyExportPostLoad& ExportPostLoad  = GetTypedOuter<URedUELegacySubsystem>()->ExportsPostLoad.AddDefaulted_GetRef();
+            			ExportPostLoad.From = LegacyObject; 
+            			ExportPostLoad.ObjectProperty = ObjectProperty;
+            			ExportPostLoad.To = Object;
+            			ExportPostLoad.ArrayIndex = Tag.ArrayIndex;
+            			InObject = nullptr;
+            		}
+            	}
+            	if (InObject && !InObject->GetClass()->IsChildOf(ObjectProperty->PropertyClass))
+            	{
+            		InObject = nullptr;
+            	}
+            	
                 ObjectProperty->SetObjectPropertyValue_InContainer(Object,InObject,Tag.ArrayIndex);
             	
             }
@@ -585,8 +620,27 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
                 {
                     for(int32 Index = 0;Index<DataCount;Index++)
                     {
-                        UObject*InObject;
+	                    UObject*InObject;
                     	Ar<<InObject;
+                    	if (ObjectProperty->PropertyClass &&
+							!ObjectProperty->PropertyClass->IsChildOf<ULegacyObject>() &&
+							ObjectProperty->PropertyClass != UObject::StaticClass() &&
+							InObject && InObject->IsA<ULegacyObject>())
+                    	{
+                    		if (ULegacyObject* LegacyObject = Cast<ULegacyObject>(InObject))
+                    		{
+                    			FRedUELegacyExportPostLoad& ExportPostLoad  = GetTypedOuter<URedUELegacySubsystem>()->ExportsPostLoad.AddDefaulted_GetRef();
+                    			ExportPostLoad.From = LegacyObject; 
+                    			ExportPostLoad.ObjectProperty = ObjectProperty;
+                    			ExportPostLoad.To = ArrayHelper.GetRawPtr(Index);
+                    			ExportPostLoad.ArrayIndex = INDEX_NONE;
+                    			InObject = nullptr;
+                    		}
+                    	}
+                    	if (InObject && !InObject->GetClass()->IsChildOf(ObjectProperty->PropertyClass))
+                    	{
+                    		InObject = nullptr;
+                    	}
 						ObjectProperty->SetObjectPropertyValue(ArrayHelper.GetRawPtr(Index),InObject);
                     }
                 }
@@ -655,6 +709,24 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
     //LegacySerializeUnrealProps(CastFieldChecked<FStructProperty>( Type->FindPropertyByName(NAME_Actor))->Struct,   CastFieldChecked<FStructProperty>( Type->FindPropertyByName(NAME_Actor))->ContainerPtrToValuePtr<void>(Object),Ar);
 }
 
+FString ULegacyObject::GetPackagePath(const FString& OutPath) const
+{
+	const FString ObjectPath = OutPath / GetLegacyFullName().Replace(TEXT("."),TEXT("/"));
+	return UPackageTools::SanitizePackageName(ObjectPath);
+}
+
+FString ULegacyObject::GetPackagePath() const
+{
+	return GetPackagePath(GetOutContentPath());
+}
+
+FString ULegacyObject::GetFullObjectPath(const FString& OutPath) const
+{
+	const FString PackageName = GetPackagePath(OutPath);
+	return PackageName + TEXT(".") + FPaths::GetBaseFilename(PackageName);;
+}
+
+
 UObject* ULegacyObject::ExportToContent()
 {
     checkNoEntry();
@@ -688,6 +760,16 @@ FName ULegacyObject::GetLegacyFName() const
 	return NAME_None;
 }
 
+TArray<FString> ULegacyObject::GetOptionalContentPaths() const
+{
+	if(URedUELegacySubsystem* RedUELegacySubsystem = GetTypedOuter<URedUELegacySubsystem>())
+	{
+		return RedUELegacySubsystem->OptionalContentPaths;
+	}
+	static const TArray<FString>  GamePaths = {FString(TEXT("/Game"))};
+	return GamePaths;
+}
+
 
 FString ULegacyObject::GetOutContentPath() const
 {
@@ -699,9 +781,41 @@ FString ULegacyObject::GetOutContentPath() const
 	return GamePath;
 }
 
+ULegacyObject* ULegacyObject::GetLegacyArchetype()
+{
+	if (LegacyPackage)
+	{
+		FRedUELegacyObjectExport& Exp = LegacyPackage->GetExport(LegacyPackageIndex);
+		if (Exp.Archetype != 0)
+		{
+			ULegacyObject* Template = nullptr;
+			if (Exp.Archetype < 0)
+			{
+				Template = LegacyPackage->GetOrCreateImport(-Exp.Archetype-1);
+			}
+			else if (Exp.Archetype > 0)
+			{
+				Template = LegacyPackage->GetOrCreateExport(Exp.Archetype-1);
+			}
+			return Template;
+		}
+	}
+	return nullptr;
+}
+
+void ULegacyUnknown::LegacySerialize(FRedUELegacyArchive& Ar)
+{
+}
+
+
 FName ULegacyObject::GetLegacyClassName_Implementation(ERedUELegacyEngineType EngineType, ERedUELegacyGameType GameType)
 {
-    FString ClassName = GetClass()->GetName();
+	FString ClassName = GetClass()->GetName();
+	if(ClassName.StartsWith(TEXT("BP_")) && ClassName.EndsWith(TEXT("_C")))
+	{
+		ClassName.RemoveAt(0,3);
+		ClassName.RemoveFromEnd(TEXT("_C"));
+	}
     if(ClassName.StartsWith(TEXT("Legacy")))
     {
         ClassName.RemoveAt(0,6);

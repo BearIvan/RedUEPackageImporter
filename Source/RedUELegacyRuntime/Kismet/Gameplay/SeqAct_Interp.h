@@ -12,58 +12,58 @@ public:
 	
 	virtual void BeginPlay() override;
 
-	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 0))
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyName = "Play"))
 	void Play();
 	
-	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 1))
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyName = "Reverse"))
 	void Reverse();
 	
-	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 2))
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyName = "Stop"))
 	void Stop();
 	
-	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 3))
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyName = "Pause"))
 	void Pause();
 
-	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 4))
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyName = "Change Dir"))
 	void Change();
 	
-	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 5))
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyName = "Set Position"))
 	void SetPosition();
 	
-	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 6))
+	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyName = "Get Position and Duration"))
 	void GetPositionAndDuration();
 
-	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0))
+	UPROPERTY(BlueprintAssignable,meta=(LegacyName = "Completed"))
 	FSequenceActionDelegate Completed;
 
-	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 1))
+	UPROPERTY(BlueprintAssignable,meta=(LegacyName = "Reversed"))
 	FSequenceActionDelegate Reversed;
 	
-	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 2))
+	UPROPERTY(BlueprintAssignable,meta=(LegacyName = "Position Set"))
 	FSequenceActionDelegate PositionSet;
 	
-	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 3))
+	UPROPERTY(BlueprintAssignable,meta = (LegacyName = "Position and Duration Retrieved"))
 	FSequenceActionDelegate PositionAndDurationRetrieved;
 	
-	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 4))
+	UPROPERTY(BlueprintAssignable,meta = (LegacyName = "Stopped"))
 	FSequenceActionDelegate Stopped;
 	
-	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0))
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyName = "Data"))
 	ALevelSequenceActor* Data;
 
 	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Data);
 	
-	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1))
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyName = "New Position"))
 	float NewPosition;
 	
 	SEQUENCE_ACTION_KISMET_ATTRIBUTE(NewPosition);
 	
-	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 2))
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyName = "Current Position"))
 	float CurrentPosition;
 	
 	SEQUENCE_ACTION_KISMET_ATTRIBUTE(CurrentPosition);
 
-	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 3))
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyName = "Duration"))
 	float Duration;
 	
 	SEQUENCE_ACTION_KISMET_ATTRIBUTE(Duration)

@@ -40,21 +40,14 @@ UObject* ULegacyMaterial3::ExportToContent()
 			Texture->ExportToContent();
 		};
 	}
-
-	const FString ObjectPath = GetOutContentPath()/ GetLegacyFullName().Replace(TEXT("."),TEXT("/"));
-	const FString PackageName = UPackageTools::SanitizePackageName(ObjectPath);
-	const FString FullObjectPath = PackageName + TEXT(".") + FPaths::GetBaseFilename(PackageName);
-	UMaterialInterface* MaterialResult = LoadObject<UMaterialInterface>(nullptr, *FullObjectPath,nullptr,LOAD_NoWarn);
-	if(!MaterialResult)
-	{
 	
-		
-		UPackage*  AssetPackage = CreatePackage(*PackageName);
-		UMaterial* Material = NewObject<UMaterial>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
+	UMaterialInterface* MaterialResult = nullptr;
+	UMaterial*Material = nullptr;
+	if(TryLoadOrCreate(MaterialResult,Material))
+	{
 		Material->PreEditChange(nullptr);
 		ULegacyMaterialExpression::Export(Material,this);
 	
-		
 		switch (BlendMode)
 		{
 		case ELegacyBlendMode::BLEND_Opaque:

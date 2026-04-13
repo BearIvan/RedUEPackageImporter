@@ -29,6 +29,7 @@ AActor* ULegacyStaticMeshCollectionActor::Spawn_Implementation()
 		if(Component&&Component->StaticMesh)
 		{
 			AStaticMeshActor* StaticMeshActor = GWorld->SpawnActor<AStaticMeshActor>(FVector(Component->Translation),Component->Rotation);
+			StaticMeshActor->SetFolderPath(*GetLegacyName());
 			StaticMeshActor->SetActorScale3D(FVector(Component->Scale3D));
 			Component->FillComponent(StaticMeshActor->GetStaticMeshComponent());
 

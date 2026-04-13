@@ -3,14 +3,18 @@
 #include "LegacySkeletalMeshComponent.generated.h"
 
 UCLASS()
-class REDUELEGACYIMPORTER_API ULegacySkeletalMeshComponent : public ULegacyPrimitiveComponent
+class REDUELEGACYIMPORTER_API ULegacySkeletalMeshComponent : public ULegacyMeshComponent
 {
 	GENERATED_BODY()
 public:
+	UFUNCTION(BlueprintCallable, Category = "Legacy|Editor",CallInEditor)
+	UAnimSequenceBase* GetAnimSequence(FName AnimName);
+		
 	virtual void FillComponent_Implementation(UActorComponent* InActorComponent) override;
 	
+	
 	UPROPERTY(BlueprintReadWrite)
-	ULegacyObject* SkeletalMesh;;
+	ULegacyObject* SkeletalMesh;
 
 	UPROPERTY(BlueprintReadWrite)
 	TArray<class ULegacyMaterialInterface*>	Materials;

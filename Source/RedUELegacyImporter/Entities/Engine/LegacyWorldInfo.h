@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "LegacyInfo.h"
 #include "Entities/LegacyActor.h"
 
 #include "LegacyWorldInfo.generated.h"
@@ -31,7 +32,16 @@ public:
 
 
 UCLASS()
-class REDUELEGACYIMPORTER_API ULegacyWorldInfo : public ULegacyActor
+class REDUELEGACYIMPORTER_API ULegacyZoneInfo : public ULegacyInfo
+{
+	GENERATED_BODY()
+public:
+	
+	
+};
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacyWorldInfo : public ULegacyZoneInfo
 {
 	GENERATED_BODY()
 public:

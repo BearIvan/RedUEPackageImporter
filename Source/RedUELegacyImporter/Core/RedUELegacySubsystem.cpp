@@ -2,11 +2,15 @@
 
 #include "Editor.h"
 #include "EditorLevelUtils.h"
+#include "LegacyTypeInfo.h"
 #include "LevelUtils.h"
 #include "PackageTools.h"
+#include "RedUELegacyImporterSettings.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/LegacyObject.h"
 #include "Core/LegacyPackage.h"
+#include "Entities/LegacyActor.h"
+#include "Entities/LegacyActorComponent.h"
 #include "Kismet/Base/SequenceAction.h"
 #include "Material/SingularityTextureFileCache.h"
 #include "Sequence/LegacySequenceObjects.h"
@@ -33,7 +37,14 @@ void URedUELegacySubsystem::ObjectPreload(ULegacyObject* InObject) const
             Package->PushStopper();
             Package->SetupReader(InObject->LegacyPackageIndex);
             UE_LOG(LogRedUELegacy,Log,TEXT("Pre loading %s %s from package %s\n"), *InObject->GetClass()->GetName(), *InObject->GetLegacyFullName(), *Package->FileName);
-            InObject->LegacySerialize(*Package);
+            if (InObject->LegacyObjectFlags & RLF_ClassDefaultObject)
+            {
+                InObject->LegacySerializeDefaultObject(*Package);
+            }
+            else
+            {
+                InObject->LegacySerialize(*Package);
+            }
             if (Package->GetStopper() != Package->Tell())
             {
                 UE_LOG(LogRedUELegacy,Warning,TEXT("%s::LegacySerialize(%s): %lld unread bytes"),*InObject->GetClass()->GetName(), *InObject->GetLegacyFullName(), Package->GetStopper() - Package->Tell());
@@ -52,7 +63,6 @@ void URedUELegacySubsystem::ObjectsBeginLoad()
 
 void URedUELegacySubsystem::ObjectsEndLoad()
 {
-    
     check(ObjectsBeginLoadCount > 0);
     if (ObjectsBeginLoadCount > 1)
     {
@@ -70,7 +80,14 @@ void URedUELegacySubsystem::ObjectsEndLoad()
             ULegacyPackage *Package = InObject->LegacyPackage;
             Package->SetupReader(InObject->LegacyPackageIndex);
             UE_LOG(LogRedUELegacy,Log,TEXT("Loading %s %s from package %s\n"), *InObject->GetClass()->GetName(), *InObject->GetLegacyFullName(), *Package->FileName);
-            InObject->LegacySerialize(*Package);
+            if (InObject->LegacyObjectFlags & RLF_ClassDefaultObject)
+            {
+                InObject->LegacySerializeDefaultObject(*Package);
+            }
+            else
+            {
+                InObject->LegacySerialize(*Package);
+            }
             if (Package->GetStopper() != Package->Tell())
             {
                 UE_LOG(LogRedUELegacy,Warning,TEXT("%s::LegacySerialize(%s): %lld unread bytes"),*InObject->GetClass()->GetName(), *InObject->GetLegacyFullName(), Package->GetStopper() - Package->Tell());
@@ -85,6 +102,19 @@ void URedUELegacySubsystem::ObjectsEndLoad()
         LoadedObject->LegacyPostLoad();
     }
     
+    for (FRedUELegacyExportPostLoad& ExportPostLoad :ExportsPostLoad)
+    {
+        if (ExportPostLoad.ArrayIndex != INDEX_NONE)
+        {
+            ExportPostLoad.ObjectProperty->SetObjectPropertyValue_InContainer(ExportPostLoad.To,ExportPostLoad.From->ExportToContent(),ExportPostLoad.ArrayIndex);
+        }
+        else
+        {
+            ExportPostLoad.ObjectProperty->SetObjectPropertyValue(ExportPostLoad.To,ExportPostLoad.From->ExportToContent());
+        }
+    }
+    ExportsPostLoad.Empty();
+    
     ensure(ObjectsLoaded.Num() == 0);
     ObjectsBeginLoadCount--;
 }
@@ -97,29 +127,93 @@ void URedUELegacySubsystem::RefreshClasses(ERedUELegacyEngineType InCurrentEngin
     Classes.Empty();
     SequenceActionClasses.Empty();
     
-    for(TObjectIterator<UClass> It; It; ++It)
     {
-        if( It->IsChildOf(ULegacyObject::StaticClass()))
+        FARFilter Filter;
+        Filter.ClassPaths.Add(UBlueprint::StaticClass()->GetClassPathName());
+        Filter.bRecursiveClasses = true;
+        Filter.TagsAndValues.Add(FBlueprintTags::NativeParentClassPath, FObjectPropertyBase::GetExportPath(ULegacyActor::StaticClass()));
+
+        const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+
+        TArray<FAssetData> AssetDataList;
+        AssetRegistryModule.Get().GetAssets(Filter, AssetDataList);
+
+        for (const FAssetData& InAssetData : AssetDataList)
         {
-            ULegacyObject* Factory = It->GetDefaultObject<ULegacyObject>();
-            if(Factory->LegacySupport(CurrentEngineType,CurrentGameType))
+            int32 BPClassFlagsInt;
+            InAssetData.GetTagValue(FBlueprintTags::ClassFlags, BPClassFlagsInt);
+
+            if (!!(BPClassFlagsInt & static_cast<int32>( CLASS_Abstract | CLASS_HideDropDown | CLASS_Deprecated | CLASS_NewerVersionExists)))
             {
-                Classes.Add(Factory->GetLegacyClassName(CurrentEngineType,CurrentGameType),*It);
+                continue;
+            }
+            if (!InAssetData.IsAssetLoaded())
+            {
+                InAssetData.GetAsset();
             }
         }
-        if (CurrentEngineType  == ERedUELegacyEngineType::UnrealEngine3)
+    }
+    {
+        FARFilter Filter;
+        Filter.ClassPaths.Add(UBlueprint::StaticClass()->GetClassPathName());
+        Filter.bRecursiveClasses = true;
+        Filter.TagsAndValues.Add(FBlueprintTags::NativeParentClassPath, FObjectPropertyBase::GetExportPath(ULegacyActorComponent::StaticClass()));
+
+        const FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+
+        TArray<FAssetData> AssetDataList;
+        AssetRegistryModule.Get().GetAssets(Filter, AssetDataList);
+
+        for (const FAssetData& InAssetData : AssetDataList)
         {
-            if( It->IsChildOf(USequenceAction::StaticClass()))
+            int32 BPClassFlagsInt;
+            InAssetData.GetTagValue(FBlueprintTags::ClassFlags, BPClassFlagsInt);
+
+            if (!!(BPClassFlagsInt & static_cast<int32>( CLASS_Abstract | CLASS_HideDropDown | CLASS_Deprecated | CLASS_NewerVersionExists)))
             {
-                FString ClassName = It->GetName();
-                if(ClassName.StartsWith(TEXT("Legacy")))
+                continue;
+            }
+            if (!InAssetData.IsAssetLoaded())
+            {
+                InAssetData.GetAsset();
+            }
+        }
+    }
+    TArray<UClass*> Libraries;
+    GetDerivedClasses(ULegacyObject::StaticClass(), Libraries);
+    Libraries.Add(ULegacyObject::StaticClass());
+    for (UClass* LibraryClass : Libraries)
+    {
+        ULegacyObject* Factory = LibraryClass->GetDefaultObject<ULegacyObject>();
+        if(Factory->LegacySupport(CurrentEngineType,CurrentGameType))
+        {
+            Classes.Add(Factory->GetLegacyClassName(CurrentEngineType,CurrentGameType),LibraryClass);
+        }
+        FName LegacyPackageName = *LibraryClass->GetMetaData(TEXT("LegacyPackage"));
+        if (!LegacyPackageName.IsNone())
+        {
+            VirtualPackages.FindOrAdd(LegacyPackageName).Classes.Add(Factory->GetLegacyClassName(CurrentEngineType,CurrentGameType),LibraryClass);
+        }
+    }
+    if (CurrentEngineType  == ERedUELegacyEngineType::UnrealEngine3)
+    {
+        TArray<UClass*> LibrariesActions;
+        GetDerivedClasses(USequenceAction::StaticClass(), LibrariesActions);
+        for (UClass* LibraryClass : LibrariesActions)
+        {
+            if (CurrentEngineType  == ERedUELegacyEngineType::UnrealEngine3)
+            {
+                if( LibraryClass->IsChildOf(USequenceAction::StaticClass()))
                 {
-                    ClassName.RemoveAt(0,6);
+                    FString ClassName = LibraryClass->GetName();
+                    if(ClassName.StartsWith(TEXT("Legacy")))
+                    {
+                        ClassName.RemoveAt(0,6);
+                    }
+                    SequenceActionClasses.Add(*ClassName, LibraryClass);
                 }
-                SequenceActionClasses.Add(*ClassName,*It);
             }
         }
-     
     }
 }
 
@@ -148,23 +242,33 @@ void URedUELegacySubsystem::Initialize(ERedUELegacyEngineType InCurrentEngineTyp
 }
 
 
-ULegacyObject* URedUELegacySubsystem::CreateObject(FName ObjectName, FName ClassName, ULegacyPackage* FromPackage)
+ULegacyObject* URedUELegacySubsystem::CreateObject(FName ObjectName, FName ClassName, ULegacyPackage* FromPackage,UObject* Outer, EObjectFlags InObjectFlags)
 {
     ensure(CurrentGameType == FromPackage->GameType);
     ensure(CurrentEngineType == FromPackage->EngineType);
     
+    if (!Outer)
+    {
+        Outer = FromPackage;
+    }
     const TSubclassOf<ULegacyObject>* Class = Classes.Find(ClassName);
     if (!Class && SequenceActionClasses.Contains(ClassName))
     {
-        ULegacySequenceImporter* SequenceImporter = NewObject<ULegacySequenceImporter>(FromPackage,ULegacySequenceImporter::StaticClass(),ObjectName);
-        SequenceImporter->ToAction = NewObject<USequenceAction>(SequenceImporter,SequenceActionClasses[ClassName],ObjectName,RF_NoFlags);
-        return SequenceImporter;
+        ULegacySequenceImporter* SequenceImporter = NewObject<ULegacySequenceImporter>(Outer,ULegacySequenceImporter::StaticClass(),ObjectName,InObjectFlags);
+        if (ensure(SequenceImporter))
+        {
+            static FName  NAME_Action = "Action";
+            SequenceImporter->ToAction = NewObject<USequenceAction>(SequenceImporter,SequenceActionClasses[ClassName],NAME_Action, InObjectFlags|RF_DefaultSubObject);
+            return SequenceImporter;
+        }
+        return nullptr;
     }
     if(!Class)
     {
         return nullptr;
     }
-    ULegacyObject*Result = NewObject<ULegacyObject>(FromPackage,Class->Get(),ObjectName);
+    ULegacyObject*Result = NewObject<ULegacyObject>(Outer,Class->Get(),ObjectName,InObjectFlags);
+    ensure(Result);
     return Result;
 }
 
@@ -215,40 +319,55 @@ void URedUELegacySubsystem::ImportWorld(FName PackageName, TSet<FName> AllowLeve
 
 ULegacyPackage* URedUELegacySubsystem::GetPackage(const FString& FileName)
 {
+    
     if(ULegacyPackage**Package =  Packages.Find(FileName))
     {
         return *Package;
     }
     
-    const FString Extensions[] = {TEXT(".xxx"),TEXT(".upk")};
-    for(const FString&Extension:Extensions)
+    auto LambdaLoadPackage = [this](const FString&FileName)->ULegacyPackage*
     {
-        for (const FString&InContentPath:InContentPaths)
+        const FString Extensions[] = {TEXT(".xxx"),TEXT(".upk")};
+        for(const FString&Extension:Extensions)
         {
-            if(FPaths::FileExists(FPaths::Combine(InContentPath,FileName+Extension)))
+            for (const FString&InContentPath:InContentPaths)
             {
-                ULegacyPackage *NewPackage  = NewObject<ULegacyPackage>(this,ULegacyPackage::StaticClass(),*FileName);
-                NewPackage->LoadPackage(*(FileName+Extension));
-                if(CurrentEngineType==ERedUELegacyEngineType::Unkown)
+                if(FPaths::FileExists(FPaths::Combine(InContentPath,FileName+Extension)))
                 {
-                    Initialize(NewPackage->EngineType,NewPackage->GameType);
+                    ULegacyPackage *NewPackage  = NewObject<ULegacyPackage>(this,ULegacyPackage::StaticClass(),*FileName);
+                    NewPackage->LoadPackage(*(FileName+Extension));
+                    if(CurrentEngineType==ERedUELegacyEngineType::Unkown)
+                    {
+                        Initialize(NewPackage->EngineType,NewPackage->GameType);
+                    }
+                    else if(NewPackage->EngineType!=CurrentEngineType||NewPackage->GameType!=CurrentGameType)
+                    {
+                        ensure(false);
+                        NewPackage->MarkAsGarbage();
+                        return nullptr;
+                    }
+                    Packages.Add(FileName,NewPackage);
+                    return NewPackage;
                 }
-                else if(NewPackage->EngineType!=CurrentEngineType||NewPackage->GameType!=CurrentGameType)
-                {
-                    ensure(false);
-                    NewPackage->MarkAsGarbage();
-                    return nullptr;
-                }
-                Packages.Add(FileName,NewPackage);
-                return NewPackage;
             }
         }
+        return nullptr;
+    };
+    if (ULegacyPackage* Package = LambdaLoadPackage(FileName))
+    {
+        if (Package->GameType == ERedUELegacyGameType::Singularity)
+        {
+            LambdaLoadPackage(FPaths::GetBaseFilename(FileName,false) + TEXT("_XSA"));
+            LambdaLoadPackage(FPaths::GetBaseFilename(FileName,false) + TEXT("_LOC_") + GetDefault<URedUELegacyImporterSettings>()->Language.ToUpper());
+        }
+        return Package;
     }
     return nullptr;
 }
 
 void URedUELegacySubsystem::Clear()
 {
+    OptionalContentPaths.Empty();
     Packages.Empty();
     ObjectsLoaded.Empty();
     Classes.Empty();
@@ -267,15 +386,23 @@ void URedUELegacySubsystem::Clear()
 void URedUELegacySubsystem::ToCacheSkeletons()
 {
     Skeletons.Empty();
-    const FString PackageName = UPackageTools::SanitizePackageName(OutContentPath);
-    FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-    TArray<FAssetData> AssetData;
-    AssetRegistryModule.Get().GetAssetsByPath(FName(*PackageName), AssetData, true);
-    for (FAssetData& Data : AssetData)
+    auto ScanLambda = [this](const FString&Path)
     {
-        if (USkeleton* Skeleton = Cast<USkeleton>(Data.GetAsset()))
+        const FString PackageName = UPackageTools::SanitizePackageName(Path);
+        FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+        TArray<FAssetData> AssetData;
+        AssetRegistryModule.Get().GetAssetsByPath(FName(*PackageName), AssetData, true);
+        for (FAssetData& Data : AssetData)
         {
-            Skeletons.Add(Skeleton);
+            if (USkeleton* Skeleton = Cast<USkeleton>(Data.GetAsset()))
+            {
+                Skeletons.Add(Skeleton);
+            }
         }
+    };
+    ScanLambda(OutContentPath);
+    for (const FString& OptionalContentPath : OptionalContentPaths)
+    {
+        ScanLambda(OptionalContentPath);
     }
 }

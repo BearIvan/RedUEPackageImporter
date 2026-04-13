@@ -10,6 +10,7 @@ class ULevelSequence;
 class ISequencer;
 class ULegacyActor;
 
+
 USTRUCT(Blueprintable)
 struct FLegacySeqOpInputLink
 {
@@ -121,7 +122,7 @@ struct FLegacySeqVarLink
 	GENERATED_BODY()
 	
 	UPROPERTY(BlueprintReadWrite)
-	class UClass* ExpectedType;
+	class ULegacyClass* ExpectedType;
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<class ULegacySequenceVariable*> LinkedVariables;
@@ -214,6 +215,14 @@ protected:
 	UK2Node* CurrentNode = nullptr;
 };
 
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacySequenceFrame : public ULegacySequenceObject
+{
+	GENERATED_BODY()
+};
+
+
 UCLASS()
 class REDUELEGACYIMPORTER_API ULegacySequenceOp : public ULegacySequenceObject
 {
@@ -236,6 +245,13 @@ public:
 	
 	UPROPERTY(BlueprintReadWrite)
 	TArray<FLegacySeqEventLink> EventLinks;
+};
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacySequenceCondition : public ULegacySequenceOp
+{
+	GENERATED_BODY()
+public:
 };
 
 UCLASS()
@@ -272,6 +288,24 @@ public:
 	TArray<class UObject*> Targets;
 };
 
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacySeqAct_Latent: public ULegacySequenceAction
+{
+	GENERATED_BODY()
+};
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacySeqAct_LevelStreamingBase: public ULegacySeqAct_Latent
+{
+	GENERATED_BODY()
+};
+
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacySeqAct_SetSequenceVariable: public ULegacySequenceAction
+{
+	GENERATED_BODY()
+};
 
 UCLASS()
 class REDUELEGACYIMPORTER_API ULegacySequenceEvent: public ULegacySequenceOp
@@ -283,10 +317,10 @@ public:
 	TArray<class ULegacySequenceEvent*> DuplicateEvts;
 	
 	UPROPERTY(BlueprintReadWrite)
-	class AActor* Originator;
+	class ULegacyActor* Originator;
 	
 	UPROPERTY(BlueprintReadWrite)
-	class AActor* Instigator;
+	class ULegacyActor* Instigator;
 	
 	UPROPERTY(BlueprintReadWrite)
 	float ActivationTime;
@@ -417,6 +451,30 @@ public:
 	
 };
 
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacySeqVar_Vector : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FVector3f VectorValue;
+	
+};
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacySeqVar_String : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
+	
+	UPROPERTY(BlueprintReadWrite)
+	FString StrValue;
+	
+};
+
 
 UCLASS()
 class REDUELEGACYIMPORTER_API ULegacySeqVar_Named: public ULegacySequenceVariable
@@ -457,6 +515,14 @@ public:
 	
 	UPROPERTY(Transient)
 	TArray<ULegacySequenceVariable*> Variables;
+};
+
+UCLASS()
+class REDUELEGACYIMPORTER_API ULegacySeqVar_Player : public ULegacySequenceVariable
+{
+	GENERATED_BODY()
+public:
+	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 };
 
 
@@ -518,7 +584,7 @@ public:
 	
 	virtual void					SimulatedImport	() override;
 
-	TMap<FName,FName>				EventName2FunctionName;
+	TMap<FString,FName>				EventName2FunctionName;
 };
 
 
@@ -680,40 +746,6 @@ public:
 
 };
 
-USTRUCT(Blueprintable)
-struct FInterpCurveVector3fPoint
-{
-	GENERATED_BODY()
-	
-	/** Float input value that corresponds to this key (eg. time). */
-	UPROPERTY(BlueprintReadWrite)
-	float		InVal;
-
-	/** Output value of templated type when input is equal to InVal. */
-	UPROPERTY(BlueprintReadWrite)
-	FVector3f	OutVal;
-
-	/** Tangent of curve arrive this point. */
-	UPROPERTY(BlueprintReadWrite)
-	FVector3f	ArriveTangent; 
-
-	/** Tangent of curve leaving this point. */
-	UPROPERTY(BlueprintReadWrite)
-	FVector3f	LeaveTangent; 
-
-	/** Interpolation mode between this point and the next one. @see EInterpCurveMode */
-	UPROPERTY(BlueprintReadWrite)
-	TEnumAsByte<EInterpCurveMode>	InterpMode; 
-};
-
-USTRUCT(Blueprintable)
-struct FInterpCurveVector3f
-{
-	GENERATED_BODY()
-	
-	UPROPERTY(BlueprintReadWrite)
-	TArray<FInterpCurveVector3fPoint> Points;
-};
 
 
 UENUM()

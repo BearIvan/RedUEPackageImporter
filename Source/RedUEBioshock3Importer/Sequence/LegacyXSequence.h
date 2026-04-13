@@ -7,14 +7,21 @@
 
 
 
-
 UCLASS()
-class REDUEBIOSHOCK3IMPORTER_API ULegacyXSeqVar_PlayerController : public ULegacySequenceVariable
+class REDUEBIOSHOCK3IMPORTER_API ULegacyXSeqVar_Player : public ULegacySeqVar_Player
 {
 	GENERATED_BODY()
 public:
-	virtual FName						GetOrCreateVariable		(UBlueprint* InBlueprint,UEdGraph* InGraph) override;
 	
+	
+};
+
+
+UCLASS()
+class REDUEBIOSHOCK3IMPORTER_API ULegacyXSeqVar_PlayerController : public ULegacyXSeqVar_Player
+{
+	GENERATED_BODY()
+public:
 	
 };
 

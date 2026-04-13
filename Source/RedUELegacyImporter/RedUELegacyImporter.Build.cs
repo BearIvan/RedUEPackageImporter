@@ -57,7 +57,7 @@ public class RedUELegacyImporter : ModuleRules
 				"Vorbis",
 				"VorbisFile",
 				"AudioEditor", 
-				"BSPUtils"
+				"BSPUtils", "BlueprintEditorLibrary"
 			}
 		);
 	}

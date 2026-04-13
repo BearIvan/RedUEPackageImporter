@@ -140,14 +140,10 @@ UObject* ULegacyMaterialInstance::ExportToContent()
 	{
 		return nullptr;
 	}
-	const FString ObjectPath = GetOutContentPath()/ GetLegacyFullName().Replace(TEXT("."),TEXT("/"));
-	const FString PackageName = UPackageTools::SanitizePackageName(ObjectPath);
-	const FString FullObjectPath = PackageName + TEXT(".") + FPaths::GetBaseFilename(PackageName);
-	UMaterialInterface* MaterialResult = LoadObject<UMaterialInterface>(nullptr, *FullObjectPath,nullptr,LOAD_NoWarn);
-	if(!MaterialResult)
+	UMaterialInterface* MaterialResult;
+	UMaterialInstanceHybrid* HybridMaterial;
+	if(TryLoadOrCreate(MaterialResult,HybridMaterial))
 	{
-		UPackage*  AssetPackage = CreatePackage(*PackageName);
-		UMaterialInstanceHybrid* HybridMaterial = NewObject<UMaterialInstanceHybrid>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
 		UMaterialInstanceConstant* Material = CastChecked<UMaterialInstanceConstant>(HybridMaterial->Parent);
 		HybridMaterial->PreEditChange(nullptr);
 		Material->PreEditChange(nullptr);

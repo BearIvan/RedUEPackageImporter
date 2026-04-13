@@ -18,6 +18,7 @@ void USeqAct_Gate::In()
 		if (--CurrentCloseCount == 0)
 		{
 			bOpen = false;
+			Closed.Broadcast();
 		}
 	}
 	
@@ -31,16 +32,20 @@ void USeqAct_Gate::Open()
 {
 	bOpen = true;
 	CurrentCloseCount = AutoCloseCount;
-	
 }
 
 void USeqAct_Gate::Close()
 {
 	bOpen = false;
+	Closed.Broadcast();
 }
 
 void USeqAct_Gate::Toggle()
 {
 	bOpen = !bOpen;
+	if (!bOpen)
+	{
+		Closed.Broadcast();
+	}
 	CurrentCloseCount = AutoCloseCount;
 }

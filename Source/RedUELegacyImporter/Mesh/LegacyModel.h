@@ -80,7 +80,7 @@ public:
 /**
  * 
  */
-UCLASS()
+UCLASS(meta = (LegacyPackage = Engine))
 class REDUELEGACYIMPORTER_API ULegacyModel : public ULegacyObject
 {
 	GENERATED_BODY()

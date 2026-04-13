@@ -4,7 +4,7 @@
 #include "LegacyLevel.h"
 #include "LegacyWorld.generated.h"
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Engine))
 class REDUELEGACYIMPORTER_API ULegacyWorld : public ULegacyObject
 {
     GENERATED_BODY()

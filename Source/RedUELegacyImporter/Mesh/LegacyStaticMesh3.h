@@ -511,7 +511,7 @@ struct FLegacyStaticMeshLODModel3
     }
 };
 
-UCLASS()
+UCLASS(meta = (LegacyPackage = Engine))
 class REDUELEGACYIMPORTER_API ULegacyStaticMesh3 : public ULegacyObject
 {
     GENERATED_BODY()

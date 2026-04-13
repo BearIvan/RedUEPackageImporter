@@ -133,9 +133,9 @@ protected:
 	void SetVariable(FName PropertyName,const T& InNewValue, M&OutValue) const
 	{
 		UObject* ObjectOuter = GetOuter();
-		auto SetValue = [](FProperty*InPropertyReference,auto ObjectOuter,const T& InNewValue)
+		auto SetValue = []<typename A>(FProperty*InPropertyReference,auto ObjectOuter,const A& InNewValue)
 		{
-			if constexpr (std::is_same_v<T,float>)
+			if constexpr (std::is_same_v<A,float>)
 			{
 				if (FDoubleProperty * DoubleProperty = CastField<FDoubleProperty>(InPropertyReference))
 				{
@@ -179,7 +179,40 @@ protected:
 						}
 					}
 				}
-				OutValue = InNewValue;
+				else if (const FSequenceActionPropertyArrayReference* PropertyArrayReference = PropertiesArrayReference.Find(PropertyName);ObjectOuter&&PropertyArrayReference)
+				{
+					int32 Num = FMath::Min(OutValue.Num(),PropertyArrayReference->ArrayElementReference.Num());
+					ensure(PropertyArrayReference->ArrayElementReference.Num() == Num);
+					for (int32 i = 0,a = 0; i < Num && a < OutValue.Num(); i++,a++)
+					{
+						if (const FMemberReference* ArrayReference = PropertyArrayReference->ArrayElementReference.Find(i))
+						{
+							if (FProperty*InPropertyReference = ArrayReference->ResolveMember<FProperty>(ObjectOuter->GetClass()))
+							{
+								if (FArrayProperty *ArrayProperty  = CastField<FArrayProperty>(InPropertyReference))
+								{
+									FScriptArrayHelper_InContainer ArrayHelper(ArrayProperty,ObjectOuter);
+									for (int32 SubI = 0;  SubI < ArrayHelper.Num() && a < OutValue.Num(); SubI++, a++)
+									{
+										SetValue(ArrayProperty->Inner,ArrayHelper.GetRawPtr(SubI),InNewValue[a]);
+									}
+								}
+								else 
+								{
+									SetValue(InPropertyReference,ObjectOuter,InNewValue[a]);
+								}
+							}
+						}
+						else
+						{
+							OutValue[i] = InNewValue[a];
+						}
+					}
+				}
+				else
+				{
+					OutValue = InNewValue;
+				}
 			}
 			else
 			{
@@ -248,7 +281,7 @@ UCLASS()
 class REDUELEGACYRUNTIME_API USequenceEvent : public USequenceAction
 {
 	GENERATED_BODY()
-public:
-	UPROPERTY(BlueprintReadWrite,EditAnywhere,Category="Event")
+public:	
+	UPROPERTY(EditAnywhere,Category="Event",meta = (LegacyRead))
 	bool bEnabled = true;
 };

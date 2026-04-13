@@ -9,7 +9,7 @@ class REDUELEGACYRUNTIME_API USeqCond_CompareInt : public USequenceAction
 	GENERATED_BODY()
 public:
 	UFUNCTION(BlueprintCallable,meta=(KismetInput,LegacyIndex = 0))
-	void In();
+	virtual void In();
 	
 	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 0), meta = (DisplayName = "ValueA <= ValueB"))
 	FSequenceActionDelegate OutA;
@@ -26,11 +26,22 @@ public:
 	UPROPERTY(BlueprintAssignable,meta = (LegacyIndex = 4), meta = (DisplayName = "ValueA >= ValueB"))
 	FSequenceActionDelegate OutE;
 	
-	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 0))
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable, LegacyRead ,LegacyIndex = 0))
 	int32 ValueA;
 	SEQUENCE_ACTION_KISMET_ATTRIBUTE(ValueA);
 	
-	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable ,LegacyIndex = 1))
+	UPROPERTY(EditAnywhere,meta=(KismetExternalVariable, LegacyRead ,LegacyIndex = 1))
 	int32 ValueB;
 	SEQUENCE_ACTION_KISMET_ATTRIBUTE(ValueB);
+};
+
+UCLASS()
+class REDUELEGACYRUNTIME_API USeqCond_Increment : public USeqCond_CompareInt
+{
+	GENERATED_BODY()
+public:
+	virtual void In() override;
+	
+	UPROPERTY(EditAnywhere,meta=(LegacyRead))
+	int32 IncrementAmount = 1;
 };

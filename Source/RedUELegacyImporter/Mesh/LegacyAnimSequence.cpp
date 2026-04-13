@@ -327,20 +327,36 @@ struct FLegacyVectorFixed48
 
 void ULegacyAnimSequence::BuildAnimation(USkeleton* Skeleton,ULegacyAnimSet* OwnerAnimSet, IAnimationDataController& Controller, const bool bShouldTransact)
 {
+	int32 CalcNumFrames = NumFrames;
+		
+	if (CalcNumFrames > 1 && bNoLoopingInterpolation)
+	{
+		CalcNumFrames--;
+	}
+	
 	for (int32 BoneIndex = 0; BoneIndex < RawAnimData.Num(); ++BoneIndex)
 	{
 		FName BoneName = OwnerAnimSet->TrackBoneNames[BoneIndex];
 		TArray<FVector> PosKeys;
 		TArray<FQuat> RotKeys;
 		TArray<FVector> ScaleKeys;
-		for (int32 FrameIndex = 0; FrameIndex < NumFrames; ++FrameIndex)
+		
+		for (int32 FrameIndex = 0; FrameIndex < CalcNumFrames; ++FrameIndex)
 		{
 			FVector3f PosKey;
 			FQuat4f RotKey;
 			FVector3f ScaleKey = {1, 1, 1};
-			RawAnimData[BoneIndex].GetBonePosition(FrameIndex, NumFrames, PosKey, RotKey);
+			RawAnimData[BoneIndex].GetBonePosition(FrameIndex, CalcNumFrames, PosKey, RotKey);
+			RotKey.Normalize();
 			PosKeys.Add(FVector(PosKey.X, PosKey.Y, PosKey.Z));
-			RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, -RotKey.W));
+			if (BoneIndex != 0)
+			{
+				RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, -RotKey.W));
+			}
+			else
+			{
+				RotKeys.Add(FQuat(RotKey.X, RotKey.Y, RotKey.Z, RotKey.W));
+			}
 			ScaleKeys.Add(FVector(ScaleKey.X, ScaleKey.Y, ScaleKey.Z));
 		}
 
@@ -398,7 +414,16 @@ UAnimSequence* ULegacyAnimSequence::CreateSequence(ULegacyAnimSet* OwnerAnimSet,
 			BuildAnimation(Skeleton,OwnerAnimSet, Controller, bShouldTransact);
 
 			AnimSequence->Interpolation = EAnimInterpolationType::Linear;
-			float NumRate = NumFrames / SequenceLength;
+			
+			int32 CalcNumFrames = NumFrames;
+		
+			if (CalcNumFrames > 1 && bNoLoopingInterpolation)
+			{
+				CalcNumFrames--;
+				
+			}
+			float NumRate = CalcNumFrames / SequenceLength;
+			
 			AnimSequence->ImportFileFramerate = NumRate;
 			AnimSequence->ImportResampleFramerate = NumRate;
 			AnimSequence->RateScale = RateScale;

@@ -23,12 +23,9 @@ UObject* ULegacyTextureCube::ExportToContent()
 	{
 		return PresentObject;
 	}
-	const FString ObjectPath = GetOutContentPath()/ GetLegacyFullName().Replace(TEXT("."),TEXT("/"));
-    const FString PackageName = UPackageTools::SanitizePackageName(ObjectPath);
-    const FString FullObjectPath = PackageName + TEXT(".") + FPaths::GetBaseFilename(PackageName);
-	UTextureCube* TextureCube = LoadObject<UTextureCube>(nullptr, *FullObjectPath,nullptr,LOAD_NoWarn);
-    if(!TextureCube)
-    {
+	UTextureCube* TextureCube;
+	if(TryLoadOrCreate(TextureCube))
+	{
 	    if(!ensure(FaceNegX))
 	    {
 		    return nullptr;
@@ -88,8 +85,6 @@ UObject* ULegacyTextureCube::ExportToContent()
 	    	FinalImage.Append(0,0,Image,5,0);
 	    }
     	
-        UPackage*  AssetPackage = CreatePackage(*PackageName);
-        TextureCube = NewObject<UTextureCube>(AssetPackage, *FPaths::GetBaseFilename(PackageName), RF_Public|RF_Standalone);
         TextureCube->PreEditChange(nullptr);
         FAssetRegistryModule::AssetCreated(TextureCube);
     	ETextureSourceFormat SourceFormat = IsHDR?TSF_RGBA16F:TSF_BGRA8;
