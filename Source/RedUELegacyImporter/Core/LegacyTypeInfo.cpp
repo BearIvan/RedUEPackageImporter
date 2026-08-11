@@ -1,5 +1,6 @@
 ﻿#include "LegacyTypeInfo.h"
 
+#include "RedUELegacySubsystem.h"
 #include "Core/RedUELegacyArchive.h"
 
 void ULegacyField::LegacySerialize(FRedUELegacyArchive& Ar)
@@ -111,6 +112,7 @@ FArchive& operator<<(FArchive& Ar, FLegacyImplementedInterface& R)
 
 void ULegacyClass::LegacySerialize(FRedUELegacyArchive& Ar)
 {
+ 
     Super::LegacySerialize(Ar);
     
     Ar << ClassFlags;
@@ -160,9 +162,10 @@ void ULegacyClass::LegacySerialize(FRedUELegacyArchive& Ar)
     Ar << ClassDefaultObject;
     if (ClassDefaultObject)
     {
+        URedUELegacySubsystem*RedUELegacySubsystem =  GetTypedOuter<URedUELegacySubsystem>();
         ClassDefaultObject->Rename(nullptr, this);
+        RedUELegacySubsystem->ObjectPreload(ClassDefaultObject);
     }
-    
 }
 
 void ULegacyProperty::LegacySerialize(FRedUELegacyArchive& Ar)

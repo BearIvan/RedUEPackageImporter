@@ -6,7 +6,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(meta = (LegacyPackage = Engine))
 class REDUEBIOSHOCK3IMPORTER_API ULegacyXPrecomputedLightingVolume : public ULegacyVolume
 {
 	GENERATED_BODY()

@@ -2,6 +2,8 @@
 #include "LegacyObject.h"
 #include "LegacyTypeInfo.generated.h"
 
+class ULegacyClass;
+
 UCLASS(NotBlueprintable)
 class REDUELEGACYIMPORTER_API ULegacyField : public ULegacyObject
 {
@@ -109,7 +111,7 @@ struct FLegacyImplementedInterface
     GENERATED_BODY()
     
     UPROPERTY(Transient)
-    class ULegacyClass* Class = nullptr;
+   ULegacyClass* Class = nullptr;
    
     UPROPERTY(Transient)
     ULegacyProperty* PointerProperty = nullptr;
@@ -146,7 +148,7 @@ public:
     TArray<FLegacyImplementedInterface> Interfaces;
     
     UPROPERTY(Transient)
-    UObject*	ClassDefaultObject;
+    ULegacyObject*	ClassDefaultObject;
 };
 
 

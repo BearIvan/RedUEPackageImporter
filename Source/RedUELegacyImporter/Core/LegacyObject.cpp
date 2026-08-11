@@ -4,6 +4,7 @@
 #include "Core/LegacyPackage.h"
 #include "Core/LegacyTypeInfo.h"
 #include "Core/RedUELegacySubsystem.h"
+#include "UObject/UnrealType.h"
 
 FLegacyRotator::operator FRotator()
 {
@@ -154,6 +155,7 @@ void ULegacyObject::LegacySerialize(FRedUELegacyArchive& Ar)
         return;
     }
 	PropertiesOffset = Ar.Tell();
+	
 	PreLegacySerializeUnrealProps(Ar);
     LegacySerializeUnrealProps(GetClass(),this,Ar);
 }
@@ -204,12 +206,14 @@ enum class EFLegacyPropType:int32
     DelegateProperty = 7,
     InterfaceProperty = 15,
 	XWeakReferenceProperty = 16,
+	QwordProperty = 17,
 };
 
 static FName NAME_StringProperty = "StringProperty";
 static FName NAME_ClassProperty = "ClassProperty";
 static FName NAME_FixedArrayProperty = "FixedArrayProperty";
 static FName NAME_XWeakReferenceProperty = "XWeakReferenceProperty";
+static FName NAME_QwordProperty = "QwordProperty";
 
 struct FLegacyPropertyTag
 {
@@ -252,6 +256,7 @@ struct FLegacyPropertyTag
         { static_cast<int32>(EFLegacyPropType::DelegateProperty), NAME_DelegateProperty },
         { static_cast<int32>(EFLegacyPropType::InterfaceProperty), NAME_InterfaceProperty },
         { static_cast<int32>(EFLegacyPropType::XWeakReferenceProperty), NAME_XWeakReferenceProperty },
+        { static_cast<int32>(EFLegacyPropType::QwordProperty), NAME_QwordProperty },
         };
 	    
 		Ar << Tag.Name;
@@ -455,6 +460,10 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
         		TypeMismatch();
         	}
         }
+        else  if(Tag.Type == NAME_QwordProperty)
+        {
+        	TypeMismatch();
+        }
         else  if(Tag.Type == NAME_IntProperty)
         {
         	if(FIntProperty* IntProperty = CastField<FIntProperty>(Property))
@@ -583,7 +592,7 @@ void ULegacyObject::LegacySerializeUnrealProps(UStruct* Type, void* Object, FRed
                 if(StructProperty->Struct->UseNativeSerialization())
                 {
                 	UScriptStruct::ICppStructOps* TheCppStructOps = StructProperty->Struct->GetCppStructOps();
-                	TheCppStructOps->Serialize(Ar,StructProperty->ContainerPtrToValuePtr<void>(Object,Tag.ArrayIndex));
+                	TheCppStructOps->Serialize(Ar, StructProperty->ContainerPtrToValuePtr<void>(Object, Tag.ArrayIndex), nullptr, nullptr);
                     //Ar.Serialize( StructProperty->ContainerPtrToValuePtr<void>(Object),StructProperty->Struct->GetPropertiesSize());
                 }
                 else

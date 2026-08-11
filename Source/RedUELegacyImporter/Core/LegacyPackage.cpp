@@ -704,7 +704,17 @@ UClass* ULegacyPackage::FindNearestClass(int32 Index)
 	{
 		LegacyClass = CastChecked<ULegacyClass>(GetOrCreateExport(Index - 1),ECastCheckedType::NullAllowed);
 	}
-	check(LegacyClass);
+	if (!LegacyClass)
+	{
+		if(!RedUELegacySubsystem->CacheNoFoundClasses.Contains(ObjectName))
+		{
+			RedUELegacySubsystem->CacheNoFoundClasses.Add(ObjectName);
+			FMessageLog RedUELegacyMessageLog("RedUELegacy");
+			RedUELegacyMessageLog.Error(FText::FromString(FString::Printf(TEXT("Can't found UClass %s"),*ObjectName.ToString())));
+			RedUELegacyMessageLog.Open(EMessageSeverity::Error);
+		}
+		return nullptr;
+	}
 	RedUELegacySubsystem->ObjectPreload(LegacyClass);
 	return FindNearestClass(LegacyClass);
 }
@@ -805,14 +815,6 @@ ULegacyObject* ULegacyPackage::GetOrCreateImport(int32 Index)
 			else
 			{
 				RefPackageName = *FPaths::GetBaseFilename(RefPackage->FileName);
-			}
-			if (PackageName.ToString() == TEXT("snd_vo_SP_WL_wav"))
-			{
-				__nop();
-			}
-			if (RefPackageName.ToString() == TEXT("snd_vo_SP_WL_wav"))
-			{
-				__nop();
 			}
 			FString LocRefPackageName = RefPackageName.ToString() + TEXT("_") + GetDefault<URedUELegacyImporterSettings>()->Language.ToUpper();
 			if (RefPackageName != PackageName && LocRefPackageName != PackageName.ToString())
@@ -998,14 +1000,34 @@ ULegacyObject* ULegacyPackage::GetOrCreateExport(int32 Index)
     		{
     			ClassObject = GetOrCreateExport(Exp.ClassIndex-1);
     		}
-    		RedUELegacySubsystem->ObjectPreload(ClassObject);
     	}
-    	if (ULegacyClass* LegacyClass = Cast<ULegacyClass>(ClassObject); LegacyClass && LegacyClass->ClassDefaultObject)
+    	TFunction<void(ULegacyClass* ClassObject)> CopyFromDefaultObjects = [&CopyFromDefaultObjects,RedUELegacySubsystem,Object = Exp.Object](ULegacyClass* ClassObject)
     	{
-    		UEngine::FCopyPropertiesForUnrelatedObjectsParams Options;
-    		Options.bDoDelta = false;
-    		UEngine::CopyPropertiesForUnrelatedObjects(LegacyClass->ClassDefaultObject, Exp.Object, Options);
-    	}
+    		if (!ClassObject)
+    		{
+    			return;
+    		}
+    		
+    		RedUELegacySubsystem->ObjectPreload(ClassObject);
+    		if (ULegacyClass* SuperClassObject = Cast<ULegacyClass>(ClassObject->SuperField))
+    		{
+    			CopyFromDefaultObjects(SuperClassObject);
+    		}
+    		if (ClassObject->ClassDefaultObject)
+    		{
+    			UEngine::FCopyPropertiesForUnrelatedObjectsParams Options;
+    			Options.bDoDelta = false;
+    			UEngine::CopyPropertiesForUnrelatedObjects(ClassObject->ClassDefaultObject, Object, Options);
+    		}
+    	};
+    	CopyFromDefaultObjects(Cast<ULegacyClass>(ClassObject));
+    	
+    	// if (ULegacyClass* LegacyClass = Cast<ULegacyClass>(ClassObject); LegacyClass && LegacyClass->ClassDefaultObject)
+    	// {
+    	// 	UEngine::FCopyPropertiesForUnrelatedObjectsParams Options;
+    	// 	Options.bDoDelta = false;
+    	// 	UEngine::CopyPropertiesForUnrelatedObjects(LegacyClass->ClassDefaultObject, Exp.Object, Options);
+    	// }
     }
     {
     	ULegacyObject* Template = nullptr;

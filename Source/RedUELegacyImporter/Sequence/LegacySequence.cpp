@@ -12,6 +12,7 @@
 #include "Kismet/Base/LegacyKismet.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "Kismet2/Kismet2NameValidators.h"
 
 UObject* ULegacySequence::ImportKismet(bool Reimport)
 {
@@ -32,6 +33,7 @@ UObject* ULegacySequence::ImportKismet(bool Reimport)
 	if( ULevelScriptBlueprint* LegacyKismetBlueprint = CastChecked<ULevelScriptBlueprint>(LevelScriptBlueprint))
 	{
 		LegacyKismetBlueprint->PreEditChange(nullptr);
+		LegacyKismetBlueprint->Modify();
 		if (UEdGraph* EventGraph = FindObject<UEdGraph>(LegacyKismetBlueprint, GraphName))
 		{
 			FBlueprintEditorUtils::RemoveGraph(LegacyKismetBlueprint,EventGraph);
@@ -47,15 +49,12 @@ UObject* ULegacySequence::ImportKismet(bool Reimport)
 		}
 		
 		FKismetEditorUtilities::GenerateBlueprintSkeleton(LegacyKismetBlueprint, true);
-		LegacyKismetBlueprint->Modify();
-		LegacyKismetBlueprint->PostEditChange();
 		FBlueprintCompilationManager::CompileSynchronously(FBPCompileRequest(LegacyKismetBlueprint, EBlueprintCompileOptions::SkeletonUpToDate, nullptr));
-		FAssetRegistryModule::AssetCreated(LegacyKismetBlueprint);
-		
+		LegacyKismetBlueprint->PostEditChange();
 		PresentObject = nullptr;
 	}
 	
-	FillActor(GetMutableDefault<ALegacyKismet>(LevelScriptBlueprint->GeneratedClass));
+	FillActor(CastChecked<ALegacyKismet>(GWorld->GetCurrentLevel()->GetLevelScriptActor()));
 	
 	return PresentObject;
 }

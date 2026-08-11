@@ -1,5 +1,7 @@
 #include "XSeqAct_SmartTerrainMultiPhaseCustomAnim_Request.h"
 
+#include "Interfaces/RedXPawnInterface.h"
+
 void UXSeqAct_SmartTerrainMultiPhaseCustomAnim_Request::SendRequests()
 {
 	TArray<AActor*>Actors = GetTargets();

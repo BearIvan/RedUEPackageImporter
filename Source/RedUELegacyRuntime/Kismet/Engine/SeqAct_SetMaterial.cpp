@@ -6,11 +6,14 @@ void USeqAct_SetMaterial::In()
 	TArray<AActor*> InActors = GetActors();
 	for (AActor* Actor : InActors)
 	{
-		TArray<UPrimitiveComponent*> PrimitiveComponents;
-		Actor->GetComponents(PrimitiveComponents);
-		for (UPrimitiveComponent* PrimitiveComponent : PrimitiveComponents)
+		if (Actor)
 		{
-			PrimitiveComponent->SetMaterial(MaterialIndex,NewMaterial);
+			TArray<UPrimitiveComponent*> PrimitiveComponents;
+			Actor->GetComponents(PrimitiveComponents);
+			for (UPrimitiveComponent* PrimitiveComponent : PrimitiveComponents)
+			{
+				PrimitiveComponent->SetMaterial(MaterialIndex,NewMaterial);
+			}
 		}
 	}
 	Out.Broadcast();

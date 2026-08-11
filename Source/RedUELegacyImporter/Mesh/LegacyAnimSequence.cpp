@@ -1655,7 +1655,7 @@ bool ULegacyMorphemeAnimSequence::CanImport()
 		FLegacyMorphemeAnimSourceTypeQSA* AnimSourceDataTypeQSA = reinterpret_cast<FLegacyMorphemeAnimSourceTypeQSA*>(CompiledAnimDataPC64.BulkData);
 		FLegacyMorphemeAnimChannelSetInfoQSA* ChannelSetsInfo = reinterpret_cast<FLegacyMorphemeAnimChannelSetInfoQSA*>(reinterpret_cast<uint8*>(AnimSourceDataTypeQSA->ChannelSetsInfo) + reinterpret_cast<int64>(AnimSourceDataTypeQSA));
 			
-		if (!ensureMsgf(ChannelSetsInfo->SplinePositionNumChannels == 0 && ChannelSetsInfo->SplineQuatNumChannels == 0,TEXT("MorphemeAnimSequence[%s] QSA anim format not support spline"),*GetLegacyFullName(),AnimationFormat))
+		if (!ensureMsgf(ChannelSetsInfo->SplinePositionNumChannels == 0 && ChannelSetsInfo->SplineQuatNumChannels == 0,TEXT("MorphemeAnimSequence[%s] QSA anim format %d not support spline"),*GetLegacyFullName(),AnimationFormat))
 		{
 			return false;
 		}

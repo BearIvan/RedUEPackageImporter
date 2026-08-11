@@ -401,7 +401,13 @@ FName ULegacySeqVar_Object::GetOrCreateVariable(UBlueprint* InBlueprint, UEdGrap
 		{
 			ensure(!ObjValue||ObjValue->IsA<ULegacyActor>());
 			FEdGraphPinType ObjectPinType(UEdGraphSchema_K2::PC_Object, NAME_None, AActor::StaticClass(), EPinContainerType::None, false, FEdGraphTerminalType());
-			if(ensure(FBlueprintEditorUtils::AddMemberVariable(InBlueprint, VarName, ObjectPinType)))
+			FString DefaultValue = TEXT("");
+			if (ObjValue&&ObjValue->PresentObject)
+			{
+				DefaultValue = ObjValue->PresentObject->GetPathName();
+			}
+			
+			if(ensure(FBlueprintEditorUtils::AddMemberVariable(InBlueprint, VarName, ObjectPinType,DefaultValue)))
 			{
 				if(ensure(InBlueprint->NewVariables.Last().VarName == VarName))
 				{
@@ -660,7 +666,27 @@ FName ULegacySeqVar_ObjectList::GetOrCreateVariable(UBlueprint* InBlueprint, UEd
 		}
 		{
 			FEdGraphPinType ObjectPinType(UEdGraphSchema_K2::PC_Object, NAME_None, AActor::StaticClass(), EPinContainerType::Array, false, FEdGraphTerminalType());
-			if(ensure(FBlueprintEditorUtils::AddMemberVariable(InBlueprint, VarName, ObjectPinType)))
+			
+			FString DefaultValue = TEXT("");
+			
+			if (ObjList.Num())
+			{
+				TArray<FString> DefaultObjectPaths;
+				DefaultObjectPaths.Reserve(ObjList.Num());
+				for (ULegacyObject* Obj : ObjList)
+				{
+					if (Obj&&Obj->PresentObject)
+					{
+						DefaultObjectPaths.Add(Obj->PresentObject->GetPathName());
+					}
+				}
+				if (DefaultObjectPaths.Num())
+				{
+					DefaultValue = FString::Printf(TEXT("(%s)"), *FString::Join(DefaultObjectPaths, TEXT(",")));
+				}
+			}
+			
+			if(ensure(FBlueprintEditorUtils::AddMemberVariable(InBlueprint, VarName, ObjectPinType,DefaultValue)))
 			{
 				if(ensure(InBlueprint->NewVariables.Last().VarName == VarName))
 				{
@@ -879,8 +905,7 @@ void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>
 	{
 		return;
 	}
-	FGuid ObjectGuid = InterpData->FindOrCreateBinding(*InterpData->CurrentKismet,InterpGroup->GroupName.ToString());
-	UMovieSceneEventTrack* Track = InterpData->FindOrCreateTrack<UMovieSceneEventTrack>(ObjectGuid, *InterpGroup->GroupName.ToString());
+	UMovieSceneEventTrack* Track = InterpData->CreateTrack<UMovieSceneEventTrack>();
 	Track->SetDisplayName(FText::FromString(InterpGroup->GroupName.ToString()));
 	UMovieSceneEventTriggerSection* Section = CastChecked<UMovieSceneEventTriggerSection>(Track->CreateNewSection());
 	Track->AddSection(*Section);
@@ -925,25 +950,32 @@ void ULegacyInterpTrackEvent::ExportToLevelSequence(const TSharedRef<ISequencer>
 				{
 					FGraphNodeCreator<UK2Node_CallFunction> NodeCreator(*NewEventNode->GetGraph());
 					UK2Node_CallFunction* NextLogicStateNode = NodeCreator.CreateNode();
-					NextLogicStateNode->SetFromFunction(InterpData->CurrentKismet->GetClass()->FindFunctionByName(*FunctionName));
+					
+					NextLogicStateNode->SetFromFunction( URedUEBlueprintFunctionLibrary::StaticClass()->FindFunctionByName(GET_FUNCTION_NAME_CHECKED(URedUEBlueprintFunctionLibrary, RemoteEventFromLevelScript)));
 					NodeCreator.Finalize();
 					NextLogicStateNode->NodePosX = NewEventNode->NodePosX + 450;
 					NextLogicStateNode->NodePosY = NewEventNode->NodePosY;
 					NewEventNode->GetThenPin()->MakeLinkTo(NextLogicStateNode->GetExecPin());
-					UEdGraphPin* NewNodeReturnValuePin =  nullptr;
-					for (UEdGraphPin* Pin : NewEventNode->Pins)
+					static FName NAME_EventName = "EventName";
+					if (UEdGraphPin* EventNamePin = NextLogicStateNode->FindPin(NAME_EventName, EGPD_Input))
 					{
-						if ((EGPD_Output == Pin->Direction) && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Object)
-						{
-							NewNodeReturnValuePin = Pin;
-							break;
-						}
+						NextLogicStateNode->GetSchema()->TrySetDefaultValue(*EventNamePin, FunctionName->ToString());
 					}
-					UEdGraphPin* OutputPin = NextLogicStateNode->FindPin(UEdGraphSchema_K2::PN_Self, EGPD_Input);
-					if (OutputPin && NewNodeReturnValuePin)
-					{
-						NewNodeReturnValuePin->MakeLinkTo(OutputPin);
-					}
+					
+					// UEdGraphPin* NewNodeReturnValuePin =  nullptr;
+					// for (UEdGraphPin* Pin : NewEventNode->Pins)
+					// {
+					// 	if ((EGPD_Output == Pin->Direction) && Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Object)
+					// 	{
+					// 		NewNodeReturnValuePin = Pin;
+					// 		break;
+					// 	}
+					// }
+					// UEdGraphPin* OutputPin = NextLogicStateNode->FindPin(UEdGraphSchema_K2::PN_Self, EGPD_Input);
+					// if (OutputPin && NewNodeReturnValuePin)
+					// {
+					// 	NewNodeReturnValuePin->MakeLinkTo(OutputPin);
+					// }
 
 					
 				}
